@@ -7,9 +7,11 @@ import type {
 import {
   postAlfredChat,
   postAlfredExecute,
+  postAlfredVoice,
   postToKnowledgeBase,
   type AlfredChatResponse,
 } from "./alfred-client.js";
+import { sendVoiceNote } from "./voice.js";
 import {
   humanReplyDelay,
   humanReadDelay,
@@ -205,6 +207,98 @@ export function makeMessageHandler(deps: {
 
     // Clear a stale warning marker once the sender is back under the cap.
     if (rateLimitWarningSent.has(phone)) rateLimitWarningSent.delete(phone);
+
+    // ─── Voice-note branch ─────────────────────────────────────────────
+    // If the message is a WhatsApp voice note, route to FK's /voice endpoint
+    // (transcribe + chat + optional TTS reply) instead of the text path.
+    // Voice-in defaults to voice-out when the reply is short enough.
+    if (msg.audio) {
+      logger.info(
+        {
+          king: effectiveKing.name,
+          messageId: msg.messageId,
+          audioBytes: Math.floor(msg.audio.base64.length * 0.75),
+        },
+        "Voice note received, forwarding to FK /voice",
+      );
+
+      // Best-effort read-receipt on the incoming voice note.
+      await humanReadDelay();
+      try {
+        await markMessageRead(wa.sock, {
+          remoteJid: msg.groupJid,
+          id: msg.messageId,
+        });
+      } catch {
+        // Non-fatal
+      }
+
+      let voiceResult;
+      try {
+        voiceResult = await postAlfredVoice({
+          senderPhone: effectiveKing.phone,
+          senderName: effectiveKing.name,
+          groupJid: msg.groupJid,
+          audioBase64: msg.audio.base64,
+          mimeType: msg.audio.mimeType,
+          messageId: msg.messageId,
+        });
+      } catch (err) {
+        logger.error({ err }, "Alfred voice call failed");
+        try {
+          await wa.sendGroupMessage(msg.groupJid, ERR_TRY_AGAIN);
+        } catch (sendErr) {
+          logger.error({ sendErr }, "Failed to send fallback error on voice");
+        }
+        return;
+      }
+
+      const replyText = (voiceResult.text || "").trim();
+
+      // Show typing while composing (matches text-path humanizer feel).
+      try {
+        await showTyping(wa.sock, msg.groupJid);
+        await humanReplyDelay(replyText || "typing");
+      } catch {
+        // Non-fatal
+      }
+
+      try {
+        await stopTyping(wa.sock, msg.groupJid);
+      } catch {
+        // Non-fatal
+      }
+
+      // If FK returned audio, send as voice note. Otherwise fall back to text.
+      if (voiceResult.audioBase64 && voiceResult.mimeType) {
+        try {
+          await sendVoiceNote(
+            wa.sock,
+            msg.groupJid,
+            voiceResult.audioBase64,
+            voiceResult.mimeType,
+          );
+        } catch (err) {
+          logger.error({ err }, "Failed to send voice-note reply, falling back to text");
+          if (replyText) {
+            try {
+              await wa.sendGroupMessage(msg.groupJid, replyText);
+            } catch (fallbackErr) {
+              logger.error({ fallbackErr }, "Fallback text send also failed");
+            }
+          }
+        }
+      } else if (replyText) {
+        try {
+          await wa.sendGroupMessage(msg.groupJid, replyText);
+        } catch (err) {
+          logger.error({ err }, "Failed to send text reply after voice note");
+        }
+      } else {
+        logger.warn({ voiceResult }, "Voice endpoint returned no text and no audio");
+      }
+      return;
+    }
 
     // ─── Text-content dedup (same king + same text within 2 min) ───────
     const textKey = `${phone}::${msg.text.trim().toLowerCase()}`;

@@ -1,6 +1,11 @@
 import { logger } from "./logger.js";
 
 const TIMEOUT_MS = 30_000;
+// Voice endpoint needs a much larger window: Whisper transcription (~5s for
+// short notes, up to 30s for 5 min audio) + Alfred chat (~10-30s) + optional
+// TTS synthesis (~5-20s). 90 sec buffer keeps most cases safe without letting
+// a hung upstream stall the bridge forever.
+const VOICE_TIMEOUT_MS = 90_000;
 
 function baseUrl(): string {
   const url = process.env.ALFRED_API_URL;
@@ -14,9 +19,9 @@ function bearer(): string {
   return `Bearer ${secret}`;
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } finally {
@@ -59,6 +64,52 @@ export async function postAlfredChat(opts: {
   }
 
   return (await res.json()) as AlfredChatResponse;
+}
+
+export interface AlfredVoiceResponse {
+  ok: boolean;
+  text: string;
+  transcript?: string;
+  audioBase64?: string | null;
+  mimeType?: string | null;
+  pendingAction?: { id: string; displayText: string } | null;
+  errorMessage?: string | null;
+}
+
+/**
+ * POST a voice note to FK's voice endpoint. FK transcribes via Whisper, runs
+ * Alfred's chat, and returns the reply text + (usually) an opus audio blob
+ * for the bridge to send back as a WhatsApp voice note.
+ */
+export async function postAlfredVoice(opts: {
+  senderPhone: string;
+  senderName: string;
+  groupJid: string;
+  audioBase64: string;
+  mimeType: string;
+  messageId: string;
+}): Promise<AlfredVoiceResponse> {
+  const url = `${baseUrl()}/api/alfred/bridge/voice`;
+  const res = await fetchWithTimeout(
+    url,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: bearer(),
+      },
+      body: JSON.stringify(opts),
+    },
+    VOICE_TIMEOUT_MS,
+  );
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    logger.error({ status: res.status, body }, "Alfred voice endpoint returned non-2xx");
+    throw new Error(`Alfred voice failed: ${res.status}`);
+  }
+
+  return (await res.json()) as AlfredVoiceResponse;
 }
 
 export async function postAlfredExecute(opts: {

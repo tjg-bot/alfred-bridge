@@ -8,6 +8,7 @@ import makeWASocket, {
 } from "@whiskeysockets/baileys";
 import qrcode from "qrcode-terminal";
 import type { Logger } from "./logger.js";
+import { downloadIncomingAudio } from "./voice.js";
 
 interface BoomLike {
   output?: { statusCode?: number };
@@ -30,6 +31,13 @@ export interface GroupMessagePayload {
     id: string | null | undefined;
     participant?: string | null;
     fromMe?: boolean;
+  };
+  /** Populated when the incoming message is a WhatsApp voice note. When set,
+   *  handlers route to FK's /api/alfred/bridge/voice endpoint instead of
+   *  /chat, since transcription happens server-side. */
+  audio?: {
+    base64: string;
+    mimeType: string;
   };
 }
 
@@ -319,6 +327,44 @@ export async function startWhatsappClient(opts: StartOpts): Promise<WAClient> {
               actionId,
               confirmed,
               groupJid,
+            });
+            continue;
+          }
+
+          // Voice-note branch: audio messages have no text. Download the
+          // audio bytes and route to onGroupMessage with an audio payload
+          // instead. The handler decides whether to hit /chat or /voice.
+          const audioMsg = msg.message.audioMessage;
+          if (audioMsg) {
+            const audioPayload = await downloadIncomingAudio(msg, s, logger);
+            if (!audioPayload) {
+              logger.warn(
+                { messageId: msg.key.id },
+                "Failed to download voice-note audio, dropping message",
+              );
+              continue;
+            }
+
+            const senderJidV = msg.key.participant || msg.key.remoteJid || "";
+            const fromV = stripJid(senderJidV);
+            const fromNameV = msg.pushName || fromV;
+            const messageIdV = msg.key.id || "";
+
+            await onGroupMessage({
+              from: fromV,
+              fromName: fromNameV,
+              text: "", // filled in server-side after Whisper transcribes
+              messageId: messageIdV,
+              groupJid,
+              quotedParticipant: null,
+              quotedFromMe: false,
+              key: {
+                remoteJid: msg.key.remoteJid,
+                id: msg.key.id,
+                participant: msg.key.participant,
+                fromMe: msg.key.fromMe || false,
+              },
+              audio: audioPayload,
             });
             continue;
           }
