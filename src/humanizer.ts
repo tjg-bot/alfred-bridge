@@ -23,12 +23,15 @@ import type { WASocket } from "@whiskeysockets/baileys";
  * Adds natural variance so consecutive replies don't land at identical intervals.
  */
 export async function humanReplyDelay(replyText: string): Promise<void> {
+  // Tuned tight: natural human pause but not sluggish. Alfred is at the top
+  // of his game, not typing on a flip phone.
   const words = replyText.trim().split(/\s+/).length;
   // Base thinking time (how long before starting to type)
-  const thinkMs = 1500 + Math.random() * 3500; // 1.5-5 sec
-  // Typing time - scale with reply length. Real humans type ~40 wpm average.
-  const typingSeconds = Math.max(3, Math.min(45, words * 0.6));
-  const typingJitter = 0.7 + Math.random() * 0.6; // 0.7x - 1.3x jitter
+  const thinkMs = 800 + Math.random() * 1700; // 0.8-2.5 sec
+  // Typing time - scale with reply length, capped tighter than before.
+  // Alfred is a professional; he types quickly, not laboriously.
+  const typingSeconds = Math.max(1.5, Math.min(12, words * 0.15));
+  const typingJitter = 0.8 + Math.random() * 0.4; // 0.8x - 1.2x jitter
   const typingMs = typingSeconds * 1000 * typingJitter;
   const totalMs = thinkMs + typingMs;
   await sleep(totalMs);
@@ -39,7 +42,8 @@ export async function humanReplyDelay(replyText: string): Promise<void> {
  * instantly read every ping. 2-15 sec.
  */
 export async function humanReadDelay(): Promise<void> {
-  await sleep(2000 + Math.random() * 13000);
+  // Tightened: 1-4 sec. Alfred reads promptly but not instantly.
+  await sleep(1000 + Math.random() * 3000);
 }
 
 /**
