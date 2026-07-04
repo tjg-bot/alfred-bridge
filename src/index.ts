@@ -11,6 +11,7 @@ import {
 import { createRateLimiter } from "./rate-limit.js";
 import { startScribeJob, getScribeStatus } from "./scribe.js";
 import { timingSafeSecretMatch } from "./scribe-security.js";
+import { loadBlocklist, getAbuseSnapshot } from "./abuse-protection.js";
 
 // Broadcast dedupe: cache dedupeKey -> timestamp for 24h. If FK-side cron
 // hits /broadcast twice with the same key, the second call short-circuits.
@@ -202,11 +203,20 @@ async function main(): Promise<void> {
   const app = express();
   app.use(express.json({ limit: "512kb" }));
 
+  // Persistent blocklist is loaded on boot so it's ready before any traffic.
+  try {
+    await loadBlocklist();
+    logger.info("Blocklist loaded from /data/blocklist.txt (or empty if new)");
+  } catch (err) {
+    logger.warn({ err }, "Blocklist load failed - continuing with empty list");
+  }
+
   app.get("/health", (_req: Request, res: Response) => {
     res.json({
       ok: true,
       connected: wa?.isConnected() ?? false,
       groupJid: groupJid || null,
+      abuse: getAbuseSnapshot(),
     });
   });
 

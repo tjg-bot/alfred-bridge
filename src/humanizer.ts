@@ -211,6 +211,12 @@ export function shouldAlfredIgnore(text: string): boolean {
   if (!trimmed) return false;
   const len = trimmed.length;
 
+  // Hyperaware: if Alfred's name appears anywhere in the message (spoken TO
+  // him OR referenced ABOUT him in third person), NEVER ignore. Kings want
+  // him to weigh in - dry aside, playful pushback, quick fact. Silence is a
+  // failure of office when he is named.
+  if (/\balfred\b/i.test(trimmed)) return false;
+
   // Tagged direct questions or slash commands always get a reply - never ignore.
   if (trimmed.startsWith("/")) return false;
   if (/@alfred/i.test(trimmed)) return false;

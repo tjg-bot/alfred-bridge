@@ -29,6 +29,7 @@ import {
 } from "./humanizer.js";
 import { shouldAlfredRespond } from "./response-filter.js";
 import { createRateLimiter } from "./rate-limit.js";
+import { checkAbuse, alertTylerAboutAbuse } from "./abuse-protection.js";
 
 const ALFRED_PHONE = (process.env.ALFRED_PHONE || "").replace(/\D/g, "");
 
@@ -168,6 +169,45 @@ export function makeMessageHandler(deps: {
       return;
     }
     if (msg.messageId) rememberMessageId(msg.messageId);
+
+    // ─── ABUSE PROTECTION (before any FK call) ─────────────────────────
+    // Runs BEFORE the FK dispatch so blocked messages cost nothing. Layers:
+    //   1. Persistent blocklist (auto-populated after repeat violations)
+    //   2. Global msgs/hr cap (protects Anthropic + OpenAI bill)
+    //   3. Per-sender msgs/hr cap (auto-blocks after N strikes/week)
+    //   4. Per-sender voice-notes/hr cap (voice is most expensive)
+    //   5. Daily USD budget cap (rough estimate; hard-silences past cap)
+    // Known kings are exempt from per-sender text caps (they naturally have
+    // busy days) but STILL count against global throughput + daily cost.
+    const isKnownKing = kings.has(phone);
+    const isVoice = Boolean(msg.audio);
+    const verdict = await checkAbuse({
+      senderPhone: phone,
+      senderName: msg.fromName,
+      kind: isVoice ? "voice" : "text",
+      groupJid: msg.groupJid,
+      textPreview: msg.text.slice(0, 200),
+      logger,
+    });
+    // Kings bypass "sender-cap" verdicts but not the global/cost caps.
+    const isSenderCapReason = !verdict.allow && /per-sender/.test(verdict.reason);
+    if (!verdict.allow && !(isKnownKing && isSenderCapReason)) {
+      logger.warn(
+        { phone, kind: isVoice ? "voice" : "text", reason: verdict.reason, isKnownKing },
+        "Abuse gate dropped message",
+      );
+      if (verdict.sendTylerAlert && wa?.sock) {
+        void alertTylerAboutAbuse({
+          sock: wa.sock,
+          senderPhone: phone,
+          senderName: msg.fromName,
+          reason: verdict.reason,
+          preview: msg.text,
+          logger,
+        });
+      }
+      return;
+    }
 
     // HARD RULE: anyone in the founding kings group is a king by definition.
     // The group is closed - only the 4 kings + Alfred are members. We do NOT
@@ -329,13 +369,16 @@ export function makeMessageHandler(deps: {
     // fail closed rather than open.
     const opsGroupJid = process.env.ALFRED_OPS_GROUP_JID || "";
     const isOpsGroup = opsGroupJid !== "" && msg.groupJid === opsGroupJid;
+    const kingsGroupJid = process.env.ALFRED_KINGS_GROUP_JID || process.env.ALFRED_GROUP_JID || "";
+    const isKingsGroup = kingsGroupJid !== "" && msg.groupJid === kingsGroupJid;
 
     const { decideResponseMode } = await import("./response-filter.js");
     const mode = decideResponseMode(msg.text);
     const repliedToAlfred = msg.quotedFromMe === true;
 
-    // Ops group: force explicit mode so Alfred always speaks up.
-    const effectiveMode = isOpsGroup ? "explicit" : mode;
+    // Ops group + Kings group: force explicit mode so Alfred always speaks up.
+    // The kings want visible engagement; silent-drop of greetings felt broken.
+    const effectiveMode = isOpsGroup || isKingsGroup ? "explicit" : mode;
 
     if (effectiveMode === "silent" && !repliedToAlfred) {
       logger.info(
@@ -395,21 +438,44 @@ export function makeMessageHandler(deps: {
     // Alfred is omnipresent. The old "sleep hours" concept is retained only
     // as a soft tempo hint (slightly slower typing during late-night ET).
 
-    let reply: AlfredChatResponse;
-    try {
-      reply = await postAlfredChat({
-        senderPhone: effectiveKing.phone,
-        senderName: effectiveKing.name,
-        groupJid: msg.groupJid,
-        text: msg.text,
-        messageId: msg.messageId,
-      });
-    } catch (err) {
-      logger.error({ err }, "Alfred chat call failed");
+    let reply: AlfredChatResponse | null = null;
+    let lastErr: unknown = null;
+    // Self-healing retry: first attempt, then a 3s backoff, then a 6s backoff.
+    // Real transient errors (Vercel cold start, upstream Claude blip, brief
+    // network hiccup) resolve within one retry. Persistent errors (401 auth
+    // drift, 500s from FK, malformed payload) surface a specific diagnostic
+    // to the group instead of a canned "having a moment".
+    for (let attempt = 1; attempt <= 3 && !reply; attempt++) {
       try {
-        await wa.sendGroupMessage(msg.groupJid, ERR_TRY_AGAIN);
+        reply = await postAlfredChat({
+          senderPhone: effectiveKing.phone,
+          senderName: effectiveKing.name,
+          groupJid: msg.groupJid,
+          text: msg.text,
+          messageId: msg.messageId,
+        });
+      } catch (err) {
+        lastErr = err;
+        logger.warn({ err, attempt }, "Alfred chat call failed - will retry if attempts remain");
+        if (attempt < 3) {
+          await new Promise((r) => setTimeout(r, attempt * 3000));
+        }
+      }
+    }
+    if (!reply) {
+      const errMsg = lastErr instanceof Error ? lastErr.message : String(lastErr || "unknown");
+      logger.error({ lastErr }, "Alfred chat call failed after 3 attempts");
+      const humanExplain = errMsg.includes("401") || errMsg.toLowerCase().includes("unauthorized")
+        ? "Mine credentials are out of sync with the wire - Tyler must refresh ALFRED_BRIDGE_SECRET on Vercel."
+        : errMsg.includes("500") || errMsg.includes("502") || errMsg.includes("503") || errMsg.includes("504")
+        ? "The FK server is unwell - a five-hundred error stopped mine reply thrice in a row. I shall try again on thy next message."
+        : errMsg.toLowerCase().includes("timeout") || errMsg.toLowerCase().includes("aborted")
+        ? "The line timed out thrice. FK server may be under load, or mine call took too long. Try again in a minute, milord."
+        : `A hiccup on the wire I could not clear in three tries. Diagnostic: ${errMsg.slice(0, 140)}. I have logged it for the record.`;
+      try {
+        await wa.sendGroupMessage(msg.groupJid, humanExplain);
       } catch (sendErr) {
-        logger.error({ sendErr }, "Failed to send fallback error message");
+        logger.error({ sendErr }, "Failed to send diagnostic error message");
       }
       return;
     }

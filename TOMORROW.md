@@ -30,14 +30,28 @@ Rebuild and restart the container.
 Append to `~/alfred-bridge/.env`:
 
 ```
+# Scribe (Tyler-only code changes via Alfred)
 SCRIBE_ENABLED=true
 ANTHROPIC_API_KEY=sk-ant-...            # required for headless claude
 SCRIBE_GIT_TOKEN=ghp_...                # GitHub PAT with 'repo' scope for the fractionkings repo
 SCRIBE_DAILY_MAX=10                     # optional, defaults to 10
 TYLER_EMAIL=tyler@fractionkings.com     # optional override
+
+# Stranger alerts + abuse protection
+ALFRED_ALERT_TARGET_PHONE=16478535829   # Tyler's E.164 digits only, where alerts DM
+ALFRED_ABUSE_GLOBAL_MSGS_PER_HOUR=200   # total msgs Alfred will process /hr across all senders
+ALFRED_ABUSE_SENDER_MSGS_PER_HOUR=20    # per-sender text cap (kings exempt in handler)
+ALFRED_ABUSE_VOICE_PER_HOUR=5           # per-sender voice-note cap (kings included - voice is expensive)
+ALFRED_ABUSE_DAILY_USD_CAP=20           # soft daily budget across chat+voice
+ALFRED_ABUSE_AUTO_BLOCK_STRIKES=3       # violations in a week that auto-block a sender
 ```
 
-Restart the container so the env picks up.
+Restart the container so the env picks up. Verify by hitting `/health` -
+the response now includes an `abuse` block:
+
+```json
+{"ok":true,"connected":true,"groupJid":"...","abuse":{"blocklistSize":0,"globalMsgsLastHour":0,"activeSenders":0,"dailySpendUsd":0,"dailySpendDate":"2026-07-04","dailyCapUsd":20}}
+```
 
 ### 3. Install ClamAV daemon (malware scanner)
 

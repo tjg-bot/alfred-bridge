@@ -9,6 +9,7 @@ import makeWASocket, {
 import qrcode from "qrcode-terminal";
 import type { Logger } from "./logger.js";
 import { downloadIncomingAudio } from "./voice.js";
+import { maybeAlertTylerAboutStranger } from "./stranger-alerts.js";
 
 interface BoomLike {
   output?: { statusCode?: number };
@@ -238,9 +239,8 @@ export async function startWhatsappClient(opts: StartOpts): Promise<WAClient> {
 
           // Group-only enforcement: Alfred must never respond to a 1-1 DM.
           // If a message arrives from a non-group JID (no @g.us suffix), we
-          // log it as a security event and drop it. This runs BEFORE the
-          // discovery-mode branch so we do not accidentally reveal Alfred's
-          // presence to random DMs.
+          // log it as a security event, DM Tyler about the stranger (rate-
+          // limited so spam doesn't flood him), and drop the message.
           if (!remoteJid.endsWith("@g.us")) {
             logger.warn(
               {
@@ -254,6 +254,14 @@ export async function startWhatsappClient(opts: StartOpts): Promise<WAClient> {
               type: "dm_to_alfred",
               from: remoteJid,
               fromName: msg.pushName || undefined,
+              logger,
+            });
+            void maybeAlertTylerAboutStranger({
+              sock: s,
+              kind: "dm_to_alfred",
+              fromJid: remoteJid,
+              fromName: msg.pushName || null,
+              preview: extractText(msg) || "",
               logger,
             });
             continue;
@@ -296,6 +304,14 @@ export async function startWhatsappClient(opts: StartOpts): Promise<WAClient> {
               type: "wrong_group",
               from: remoteJid,
               fromName: msg.pushName || undefined,
+              logger,
+            });
+            void maybeAlertTylerAboutStranger({
+              sock: s,
+              kind: "wrong_group",
+              fromJid: remoteJid,
+              fromName: msg.pushName || null,
+              preview: extractText(msg) || "",
               logger,
             });
             continue;
