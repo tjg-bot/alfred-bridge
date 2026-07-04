@@ -312,19 +312,34 @@ export function makeMessageHandler(deps: {
     }
     recentTextByKing.set(textKey, Date.now());
 
-    // ─── Tag-only response filter ──────────────────────────────────────
-    // Alfred only replies when explicitly addressed. Everything else goes
-    // silently to the FK knowledge base for context. This is the biggest
-    // "feels like a real colleague" lever - real people don't chime in on
-    // every message. Alfred uses judgment: explicit tags always respond,
-    // relevant-topic messages get forwarded so Alfred can decide, everything
-    // else is silent (still logged to knowledge base).
+    // ─── Response filter (per-group policy) ─────────────────────────────
+    // Two different policies depending on which group this came from:
+    //
+    //   KINGS group  -> tag-or-relevant mode. Alfred stays quiet for pure
+    //                   background chat because the kings don't want their
+    //                   council spammed. Explicit tag + relevant-topic
+    //                   messages still get through.
+    //
+    //   OPS group    -> always respond. Staff (Danlyn, Dhei) need visible
+    //                   engagement from Alfred so instructions land. If they
+    //                   say "noted" or "done" Alfred replies with a crisp
+    //                   professional ack. No butler voice here - staff tone.
+    //
+    // Any other group (unknown / new) falls back to the kings policy so we
+    // fail closed rather than open.
+    const opsGroupJid = process.env.ALFRED_OPS_GROUP_JID || "";
+    const isOpsGroup = opsGroupJid !== "" && msg.groupJid === opsGroupJid;
+
     const { decideResponseMode } = await import("./response-filter.js");
     const mode = decideResponseMode(msg.text);
     const repliedToAlfred = msg.quotedFromMe === true;
-    if (mode === "silent" && !repliedToAlfred) {
+
+    // Ops group: force explicit mode so Alfred always speaks up.
+    const effectiveMode = isOpsGroup ? "explicit" : mode;
+
+    if (effectiveMode === "silent" && !repliedToAlfred) {
       logger.info(
-        { king: effectiveKing.name, messageId: msg.messageId, textLen: msg.text.length, mode },
+        { king: effectiveKing.name, messageId: msg.messageId, textLen: msg.text.length, mode, isOpsGroup },
         "Message not relevant to Alfred, logging to knowledge base and staying silent"
       );
       await postToKnowledgeBase({

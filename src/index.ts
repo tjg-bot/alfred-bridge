@@ -6,10 +6,11 @@ import { makeMessageHandler, makeButtonHandler } from "./handlers.js";
 import {
   setPresenceAvailable,
   setPresenceUnavailable,
-  isAlfredAsleep,
   getAlfredAvailabilityState,
 } from "./humanizer.js";
 import { createRateLimiter } from "./rate-limit.js";
+import { startScribeJob, getScribeStatus } from "./scribe.js";
+import { timingSafeSecretMatch } from "./scribe-security.js";
 
 // Broadcast dedupe: cache dedupeKey -> timestamp for 24h. If FK-side cron
 // hits /broadcast twice with the same key, the second call short-circuits.
@@ -120,18 +121,20 @@ async function main(): Promise<void> {
     logger,
   });
 
-  // Humanizer: presence cycler. Alfred is "available" during waking hours
-  // and "unavailable" at night. This is a huge anti-bot signal since real
-  // humans don't stay online 24/7. Runs every 5 minutes with slight jitter.
+  // OMNIPRESENCE (hard rule): Alfred is always available. No sleep-hour gate,
+  // no overnight offline. Only exception is the occasional 2% micro-AFK during
+  // the day so his presence isn't a suspicious flat line - real humans put
+  // their phone down for a minute here and there.
   const presenceCycler = setInterval(() => {
     try {
       if (!wa?.sock) return;
-      const asleep = isAlfredAsleep();
-      // Occasional micro-toggle (2% chance) so Alfred goes AFK briefly during the
-      // day - real humans check their phone and put it down.
       const microAfk = Math.random() < 0.02;
-      if (asleep || microAfk) {
+      if (microAfk) {
         void setPresenceUnavailable(wa.sock);
+        // Come back online within 30-90 sec.
+        setTimeout(() => {
+          if (wa?.sock) void setPresenceAvailable(wa.sock);
+        }, 30_000 + Math.floor(Math.random() * 60_000));
       } else {
         void setPresenceAvailable(wa.sock);
       }
@@ -140,17 +143,11 @@ async function main(): Promise<void> {
     }
   }, 5 * 60 * 1000 + Math.floor(Math.random() * 60 * 1000));
 
-  // Set initial presence based on current sleep state.
+  // Boot: come online immediately. No sleep-gate check.
   setTimeout(() => {
     if (!wa?.sock) return;
-    const asleep = isAlfredAsleep();
-    if (asleep) {
-      void setPresenceUnavailable(wa.sock);
-      logger.info("Alfred set to unavailable at boot (overnight sleep hours)");
-    } else {
-      void setPresenceAvailable(wa.sock);
-      logger.info("Alfred set to available at boot");
-    }
+    void setPresenceAvailable(wa.sock);
+    logger.info("Alfred set to available at boot (omnipresence mode - no sleep gate)");
   }, 5000);
 
   // Catch-up sweep on boot: query FK for king messages that were addressed to
@@ -322,6 +319,64 @@ async function main(): Promise<void> {
       logger.error({ err }, "Broadcast failed");
       res.status(500).json({ error: "send failed" });
     }
+  });
+
+  // ─── Scribe (Claude Code on Oracle) ─────────────────────────────────────
+  // POST /scribe: FK server dispatches a code-change task from Tyler here.
+  // Body: {taskId, prompt, requesterEmail, requesterName}. Returns immediately;
+  // work runs async. Poll /scribe/status?taskId=... for result.
+  //
+  // Auth: bridge secret via Authorization: Bearer <secret>.
+  // Tyler check happens BOTH here (defence in depth) and at FK server.
+  app.post("/scribe", async (req: Request, res: Response) => {
+    const provided = (req.header("authorization") || "").replace(/^Bearer\s+/i, "");
+    if (!timingSafeSecretMatch(provided, bridgeSecret)) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+    const body = req.body as
+      | {
+          taskId?: string;
+          prompt?: string;
+          requesterEmail?: string;
+          requesterName?: string;
+        }
+      | undefined;
+    if (!body?.taskId || !body?.prompt || !body?.requesterEmail) {
+      res.status(400).json({ error: "missing taskId, prompt, or requesterEmail" });
+      return;
+    }
+    try {
+      const result = await startScribeJob({
+        taskId: String(body.taskId),
+        prompt: String(body.prompt),
+        requesterEmail: String(body.requesterEmail),
+        requesterName: String(body.requesterName || ""),
+      });
+      res.status(result.ok ? 202 : 403).json(result);
+    } catch (err) {
+      logger.error({ err }, "Scribe start failed");
+      res.status(500).json({ error: "scribe start failed" });
+    }
+  });
+
+  app.get("/scribe/status", (req: Request, res: Response) => {
+    const provided = (req.header("authorization") || "").replace(/^Bearer\s+/i, "");
+    if (!timingSafeSecretMatch(provided, bridgeSecret)) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+    const taskId = String(req.query.taskId || "");
+    if (!taskId) {
+      res.status(400).json({ error: "missing taskId" });
+      return;
+    }
+    const job = getScribeStatus(taskId);
+    if (!job) {
+      res.status(404).json({ error: "task not found or already flushed" });
+      return;
+    }
+    res.json(job);
   });
 
   const server = app.listen(port, () => {
