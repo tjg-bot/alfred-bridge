@@ -43,7 +43,8 @@ export interface ButtonReplyPayload {
 
 export interface StartOpts {
   authPath: string;
-  groupJid: string;
+  groupJid: string;                       // legacy: single-group callers
+  allowedGroupJids?: string[];            // new: list of allowed groups. If unset, falls back to [groupJid].
   onGroupMessage: (msg: GroupMessagePayload) => Promise<void>;
   onButtonReply: (payload: ButtonReplyPayload) => Promise<void>;
   logger: Logger;
@@ -270,15 +271,18 @@ export async function startWhatsappClient(opts: StartOpts): Promise<WAClient> {
             continue;
           }
 
-          if (remoteJid !== groupJid) {
+          const allowedGroupJids = opts.allowedGroupJids && opts.allowedGroupJids.length > 0
+            ? opts.allowedGroupJids
+            : [groupJid];
+          if (!allowedGroupJids.includes(remoteJid)) {
             logger.warn(
               {
                 securityEvent: "wrong_group",
                 from: remoteJid,
-                expected: groupJid,
+                allowed: allowedGroupJids,
                 fromName: msg.pushName,
               },
-              "Ignoring message from a group that is not the founding kings group"
+              "Ignoring message from a group that is not in the allow list"
             );
             void reportSecurityEvent({
               type: "wrong_group",

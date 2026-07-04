@@ -58,7 +58,23 @@ function requiredEnv(name: string): string {
 async function main(): Promise<void> {
   const port = Number(process.env.PORT || 8080);
   const authPath = process.env.BRIDGE_AUTH_PATH || "./auth-state";
-  const groupJid = process.env.ALFRED_GROUP_JID || "";
+  // Multi-group support. ALFRED_GROUP_JIDS is a comma-separated list. For
+  // backwards compat we also accept the older single ALFRED_GROUP_JID.
+  // Additionally we recognise two distinct roles per group:
+  //   ALFRED_KINGS_GROUP_JID - the founding kings council
+  //   ALFRED_OPS_GROUP_JID   - the operations group with staff (Danlyn, Dhei)
+  const groupJids = (
+    process.env.ALFRED_GROUP_JIDS ||
+    [process.env.ALFRED_KINGS_GROUP_JID, process.env.ALFRED_OPS_GROUP_JID, process.env.ALFRED_GROUP_JID]
+      .filter(Boolean)
+      .join(",")
+  )
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const groupJid = groupJids[0] || "";  // legacy single-group callers keep working
+  const kingsGroupJid = process.env.ALFRED_KINGS_GROUP_JID || groupJid;
+  const opsGroupJid = process.env.ALFRED_OPS_GROUP_JID || "";
 
   requiredEnv("ALFRED_API_URL");
   requiredEnv("ALFRED_BRIDGE_SECRET");
@@ -98,6 +114,7 @@ async function main(): Promise<void> {
   wa = await startWhatsappClient({
     authPath,
     groupJid,
+    allowedGroupJids: groupJids.length > 0 ? groupJids : undefined,
     onGroupMessage: messageHandler,
     onButtonReply: buttonHandler,
     logger,
