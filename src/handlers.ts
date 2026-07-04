@@ -222,13 +222,16 @@ export function makeMessageHandler(deps: {
     // Alfred only replies when explicitly addressed. Everything else goes
     // silently to the FK knowledge base for context. This is the biggest
     // "feels like a real colleague" lever - real people don't chime in on
-    // every message.
-    const addressed = shouldAlfredRespond(msg.text, ALFRED_PHONE);
+    // every message. Alfred uses judgment: explicit tags always respond,
+    // relevant-topic messages get forwarded so Alfred can decide, everything
+    // else is silent (still logged to knowledge base).
+    const { decideResponseMode } = await import("./response-filter.js");
+    const mode = decideResponseMode(msg.text);
     const repliedToAlfred = msg.quotedFromMe === true;
-    if (!addressed && !repliedToAlfred) {
+    if (mode === "silent" && !repliedToAlfred) {
       logger.info(
-        { king: effectiveKing.name, messageId: msg.messageId, textLen: msg.text.length },
-        "Message not addressed to Alfred, logging to knowledge base and staying silent"
+        { king: effectiveKing.name, messageId: msg.messageId, textLen: msg.text.length, mode },
+        "Message not relevant to Alfred, logging to knowledge base and staying silent"
       );
       await postToKnowledgeBase({
         senderPhone: effectiveKing.phone,
@@ -240,25 +243,11 @@ export function makeMessageHandler(deps: {
       return;
     }
 
-    // ─── Availability state ────────────────────────────────────────────
+    // ─── Availability state (informational only) ────────────────────────
+    // Alfred is OMNIPRESENT. He never sleeps. Availability state is used
+    // purely to shape the response tempo (a bit slower at night to feel
+    // human), never to silence him.
     const availability = getAlfredAvailabilityState();
-    if (availability === "asleep") {
-      // Only slash-command "emergencies" wake him.
-      if (!msg.text.trim().startsWith("/")) {
-        logger.info(
-          { king: effectiveKing.name, messageId: msg.messageId },
-          "Alfred asleep, message not an emergency slash-command, staying silent"
-        );
-        await postToKnowledgeBase({
-          senderPhone: effectiveKing.phone,
-          senderName: effectiveKing.name,
-          groupJid: msg.groupJid,
-          text: msg.text,
-          messageId: msg.messageId,
-        });
-        return;
-      }
-    }
 
     // ─── Probabilistic human ignore ────────────────────────────────────
     // Real humans don't respond to EVERY message directed at them.
@@ -294,13 +283,8 @@ export function makeMessageHandler(deps: {
       // Non-fatal
     }
 
-    // If Alfred is "asleep" (overnight ET), we let the message sit until morning.
-    // Kings can still send urgent messages, but Alfred replies once he "wakes".
-    // For MVP we still reply, just log the sleep state.
-    const asleep = isAlfredAsleep();
-    if (asleep) {
-      logger.info({ king: effectiveKing.name }, "Alfred is in overnight sleep hours - replying anyway but slower");
-    }
+    // Alfred is omnipresent. The old "sleep hours" concept is retained only
+    // as a soft tempo hint (slightly slower typing during late-night ET).
 
     let reply: AlfredChatResponse;
     try {

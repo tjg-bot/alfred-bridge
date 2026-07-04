@@ -24,32 +24,74 @@
  * @param _myPhoneE164 - Alfred's own phone in E.164 digits-only form.
  *                      Reserved for future self-mention matching by phone.
  */
-export function shouldAlfredRespond(text: string, _myPhoneE164: string): boolean {
-  if (!text) return false;
-  const raw = text.trim();
-  if (!raw) return false;
+export type ResponseDecision = "explicit" | "relevant" | "silent";
 
-  // Rule 5: slash commands
-  if (raw.startsWith("/")) return true;
+/**
+ * Decides Alfred's response mode for an incoming message.
+ *
+ * "explicit"  - Alfred is directly named or given a slash command. He MUST
+ *               respond promptly and helpfully.
+ * "relevant"  - Message mentions an org topic Alfred owns (ads, bookings,
+ *               prospects, spend, sentinel, security, deploys, kings, etc).
+ *               Alfred is invited to consider whether to add value. The FK
+ *               server-side prompt tells Alfred he may STAY SILENT if he
+ *               has nothing to add; otherwise he weighs in with judgment.
+ * "silent"    - Neither of the above. Alfred still logs to knowledge base
+ *               but does not respond.
+ */
+export function decideResponseMode(text: string): ResponseDecision {
+  if (!text) return "silent";
+  const raw = text.trim();
+  if (!raw) return "silent";
+
+  if (raw.startsWith("/")) return "explicit";
 
   const lower = raw.toLowerCase();
+  if (lower.includes("@alfred")) return "explicit";
+  if (/^alfred[\s,:.]/i.test(raw)) return "explicit";
+  if (/^alfred$/i.test(raw)) return "explicit";
+  if (/^(hey|yo|hi|hello|yes|ok|okay)\s+alfred\b/i.test(raw)) return "explicit";
+  if (/,\s*alfred\s*[?.!]?\s*$/i.test(raw)) return "explicit";
+  if (/\balfred\b/i.test(lower)) return "explicit"; // any mention of alfred by name
 
-  // Rule 1: @alfred mention anywhere in the message
-  if (lower.includes("@alfred")) return true;
+  // Relevance keywords: org-topics Alfred owns. Case-insensitive whole-word.
+  const relevanceRegex = new RegExp(
+    "\\b(" +
+      [
+        // Ads / marketing
+        "ad", "ads", "advert", "campaign", "campaigns", "meta", "facebook", "instagram",
+        "cpa", "cpm", "ctr", "roas", "spend", "budget", "creative", "targeting",
+        // Bookings / calendar
+        "booking", "bookings", "call", "calls", "meeting", "meetings", "calendar",
+        "fit-call", "fit call", "reschedule", "cancel",
+        // Prospects / sales
+        "prospect", "prospects", "lead", "leads", "deal", "deals", "pipeline",
+        "outreach", "edgar", "issuer", "issuers",
+        // Metrics / revenue
+        "revenue", "mrr", "arr", "conversion", "conversions", "profit", "margin",
+        // Product / crowdfunding
+        "reg d", "reg cf", "506c", "506\\(c\\)", "crowdfunding", "fractionalize",
+        "wefunder", "republic", "startengine", "raise", "raises",
+        // Ops / security
+        "deploy", "deployed", "deployment", "sentinel", "site doctor", "error",
+        "errors", "vercel", "sentry",
+        // FK-specific
+        "fraction kings", "freeman filing", "council",
+      ].join("|") +
+      ")\\b",
+    "i",
+  );
+  if (relevanceRegex.test(raw)) return "relevant";
 
-  // Rule 2: starts with "Alfred," or "Alfred:" or "Alfred "
-  //         (followed by a space, comma, colon, or end-of-string)
-  if (/^alfred[\s,:.]/i.test(raw)) return true;
-  if (/^alfred$/i.test(raw)) return true;
+  return "silent";
+}
 
-  // Rule 3: greeting-style opener with Alfred
-  if (/^(hey|yo|hi|hello|yes)\s+alfred\b/i.test(raw)) return true;
-
-  // Rule 4: message ends with "..., alfred?" or "..., alfred."
-  //         Covers "what do you think, alfred?" style direct address.
-  if (/,\s*alfred\s*[?.!]?\s*$/i.test(raw)) return true;
-
-  return false;
+/**
+ * Legacy boolean wrapper. Returns true if the message triggers ANY response
+ * (explicit or relevant). Preserved for existing callers.
+ */
+export function shouldAlfredRespond(text: string, _myPhoneE164: string): boolean {
+  return decideResponseMode(text) !== "silent";
 }
 
 /**
