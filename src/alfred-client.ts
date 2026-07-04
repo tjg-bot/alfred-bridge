@@ -143,3 +143,40 @@ export async function postAlfredHealth(): Promise<{ ok: boolean }> {
     return { ok: false };
   }
 }
+
+export interface UnansweredMessage {
+  text: string;
+  senderPhone: string;
+  senderName: string;
+  senderKingEmail: string | null;
+  messageId: string | null;
+  createdAt: string;
+}
+
+/**
+ * Ask FK which king messages went unanswered while Alfred was offline. Used
+ * on bridge boot so Alfred can catch up like a person returning to their
+ * phone. Bridge then replies to each with human pacing.
+ */
+export async function postAlfredCatchUp(opts: {
+  hours?: number;
+  maxMessages?: number;
+}): Promise<UnansweredMessage[]> {
+  const url = `${baseUrl()}/api/alfred/bridge/catch-up`;
+  try {
+    const res = await fetchWithTimeout(url, {
+      method: "POST",
+      headers: { Authorization: bearer(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        hours: opts.hours ?? 6,
+        maxMessages: opts.maxMessages ?? 10,
+      }),
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { unanswered?: UnansweredMessage[] };
+    return Array.isArray(data.unanswered) ? data.unanswered : [];
+  } catch (err) {
+    logger.warn({ err }, "postAlfredCatchUp failed - continuing without catch-up");
+    return [];
+  }
+}

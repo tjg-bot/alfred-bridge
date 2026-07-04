@@ -136,6 +136,55 @@ async function main(): Promise<void> {
     }
   }, 5000);
 
+  // Catch-up sweep on boot: query FK for king messages that were addressed to
+  // Alfred in the last 6 hours but never got a reply. Post responses to each,
+  // one at a time, with human pacing (30-90 sec between messages) so it feels
+  // like a person catching up on missed threads. Fire after WhatsApp is
+  // stable (30 sec after boot).
+  setTimeout(async () => {
+    if (!wa?.sock || !wa.isConnected()) {
+      logger.warn("Skipping boot catch-up: WhatsApp not connected");
+      return;
+    }
+    try {
+      const { postAlfredCatchUp, postAlfredChat } = await import("./alfred-client.js");
+      const unanswered = await postAlfredCatchUp({ hours: 6, maxMessages: 8 });
+      if (unanswered.length === 0) {
+        logger.info("Boot catch-up: no unanswered messages found");
+        return;
+      }
+      logger.info({ count: unanswered.length }, "Boot catch-up: replying to unanswered messages");
+
+      for (let i = 0; i < unanswered.length; i++) {
+        const msg = unanswered[i];
+        try {
+          const reply = await postAlfredChat({
+            senderPhone: msg.senderPhone,
+            senderName: msg.senderName,
+            groupJid: groupJid,
+            text: `[CATCH-UP - I was briefly offline, replying now to thy earlier message] ${msg.text}`,
+            messageId: msg.messageId || `catchup-${Date.now()}-${i}`,
+          });
+          const text = reply.text || reply.errorMessage || "";
+          if (text && wa?.sock && groupJid) {
+            await wa.sendGroupMessage(groupJid, text);
+          }
+        } catch (err) {
+          logger.warn({ err, messageId: msg.messageId }, "Catch-up reply failed for one message");
+        }
+        // Human pacing between catch-up replies: 30-90 sec.
+        if (i < unanswered.length - 1) {
+          const pauseMs = 30_000 + Math.floor(Math.random() * 60_000);
+          await new Promise((resolve) => setTimeout(resolve, pauseMs));
+        }
+      }
+
+      logger.info({ replied: unanswered.length }, "Boot catch-up complete");
+    } catch (err) {
+      logger.warn({ err }, "Boot catch-up sweep failed - non-fatal");
+    }
+  }, 30_000);
+
   const app = express();
   app.use(express.json({ limit: "512kb" }));
 
