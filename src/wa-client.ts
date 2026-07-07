@@ -138,8 +138,8 @@ interface SecurityEvent {
  * locally so the event shows up in Fly.io logs.
  */
 async function reportSecurityEvent(evt: SecurityEvent): Promise<void> {
-  const apiUrl = process.env.ALFRED_API_URL;
-  const secret = process.env.ALFRED_BRIDGE_SECRET;
+  const apiUrl = (process.env.MAXIMUS_API_URL || process.env.ALFRED_API_URL);
+  const secret = (process.env.MAXIMUS_BRIDGE_SECRET || process.env.ALFRED_BRIDGE_SECRET);
   if (!apiUrl || !secret) return;
   const url = `${apiUrl.replace(/\/$/, "")}/api/alfred/bridge/security-event`;
   const controller = new AbortController();

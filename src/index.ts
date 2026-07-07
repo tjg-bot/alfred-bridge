@@ -49,9 +49,12 @@ function sanitizeBroadcastText(raw: string): string {
 }
 
 function requiredEnv(name: string): string {
-  const val = process.env[name];
+  // During Alfred -> Maximus rename we accept either MAXIMUS_ or ALFRED_
+  // prefix. If the caller passes an ALFRED_ name, check MAXIMUS_ first.
+  const maximusName = name.startsWith("ALFRED_") ? "MAXIMUS_" + name.slice("ALFRED_".length) : name;
+  const val = process.env[maximusName] || process.env[name];
   if (!val) {
-    logger.error({ name }, "Missing required env var");
+    logger.error({ name, maximusName }, "Missing required env var (checked both MAXIMUS_ and ALFRED_ prefixes)");
     process.exit(1);
   }
   return val;
@@ -66,8 +69,8 @@ async function main(): Promise<void> {
   //   ALFRED_KINGS_GROUP_JID - the founding kings council
   //   ALFRED_OPS_GROUP_JID   - the operations group with staff (Danlyn, Dhei)
   const groupJids = (
-    process.env.ALFRED_GROUP_JIDS ||
-    [process.env.ALFRED_KINGS_GROUP_JID, process.env.ALFRED_OPS_GROUP_JID, process.env.ALFRED_GROUP_JID]
+    (process.env.MAXIMUS_GROUP_JIDS || process.env.ALFRED_GROUP_JIDS) ||
+    [(process.env.MAXIMUS_KINGS_GROUP_JID || process.env.ALFRED_KINGS_GROUP_JID), (process.env.MAXIMUS_OPS_GROUP_JID || process.env.ALFRED_OPS_GROUP_JID), (process.env.MAXIMUS_GROUP_JID || process.env.ALFRED_GROUP_JID)]
       .filter(Boolean)
       .join(",")
   )
@@ -75,12 +78,12 @@ async function main(): Promise<void> {
     .map((s) => s.trim())
     .filter(Boolean);
   const groupJid = groupJids[0] || "";  // legacy single-group callers keep working
-  const kingsGroupJid = process.env.ALFRED_KINGS_GROUP_JID || groupJid;
-  const opsGroupJid = process.env.ALFRED_OPS_GROUP_JID || "";
+  const kingsGroupJid = (process.env.MAXIMUS_KINGS_GROUP_JID || process.env.ALFRED_KINGS_GROUP_JID) || groupJid;
+  const opsGroupJid = (process.env.MAXIMUS_OPS_GROUP_JID || process.env.ALFRED_OPS_GROUP_JID) || "";
 
   requiredEnv("ALFRED_API_URL");
   requiredEnv("ALFRED_BRIDGE_SECRET");
-  const bridgeSecret = process.env.ALFRED_BRIDGE_SECRET!;
+  const bridgeSecret = (process.env.MAXIMUS_BRIDGE_SECRET || process.env.ALFRED_BRIDGE_SECRET)!;
 
   if (!groupJid) {
     logger.warn(
@@ -91,7 +94,7 @@ async function main(): Promise<void> {
   // ─── Startup one-liner ──────────────────────────────────────────────
   // Anyone tailing Railway/Fly logs should see Alfred's operating mode at
   // a glance without hunting through pino JSON.
-  const alfredPhoneRaw = (process.env.ALFRED_PHONE || "").replace(/\D/g, "");
+  const alfredPhoneRaw = ((process.env.MAXIMUS_PHONE || process.env.ALFRED_PHONE) || "").replace(/\D/g, "");
   const maskedPhone = alfredPhoneRaw
     ? `${alfredPhoneRaw.slice(0, 2)}${"*".repeat(Math.max(0, alfredPhoneRaw.length - 4))}${alfredPhoneRaw.slice(-2)}`
     : "unset";

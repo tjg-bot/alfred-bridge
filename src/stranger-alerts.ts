@@ -22,9 +22,9 @@
 import type { WASocket } from "@whiskeysockets/baileys";
 import type { Logger } from "./logger.js";
 
-const PER_SENDER_TTL_MS = Number(process.env.ALFRED_ALERT_PER_SENDER_TTL_MS || 6 * 60 * 60 * 1000);
-const GLOBAL_MAX_PER_HOUR = Number(process.env.ALFRED_ALERT_GLOBAL_MAX_PER_HOUR || 10);
-const SPAM_THRESHOLD = Number(process.env.ALFRED_ALERT_SPAM_THRESHOLD || 3);
+const PER_SENDER_TTL_MS = Number((process.env.MAXIMUS_ALERT_PER_SENDER_TTL_MS || process.env.ALFRED_ALERT_PER_SENDER_TTL_MS) || 6 * 60 * 60 * 1000);
+const GLOBAL_MAX_PER_HOUR = Number((process.env.MAXIMUS_ALERT_GLOBAL_MAX_PER_HOUR || process.env.ALFRED_ALERT_GLOBAL_MAX_PER_HOUR) || 10);
+const SPAM_THRESHOLD = Number((process.env.MAXIMUS_ALERT_SPAM_THRESHOLD || process.env.ALFRED_ALERT_SPAM_THRESHOLD) || 3);
 const SPAM_WINDOW_MS = 10 * 60 * 1000;
 
 // Per-sender last-alerted timestamp so a repeat msg from the same person
@@ -44,7 +44,7 @@ function normalizePhone(raw: string | undefined | null): string | null {
 }
 
 function tylerAlertJid(): string | null {
-  const phone = normalizePhone(process.env.ALFRED_ALERT_TARGET_PHONE);
+  const phone = normalizePhone((process.env.MAXIMUS_ALERT_TARGET_PHONE || process.env.ALFRED_ALERT_TARGET_PHONE));
   if (!phone) return null;
   return `${phone}@s.whatsapp.net`;
 }

@@ -48,11 +48,11 @@ import { maybeAlertTylerAboutStranger } from "./stranger-alerts.js";
 
 // ─── Tunables (env-overridable) ────────────────────────────────────────────
 
-const GLOBAL_MSGS_PER_HOUR = Number(process.env.ALFRED_ABUSE_GLOBAL_MSGS_PER_HOUR || 200);
-const SENDER_MSGS_PER_HOUR = Number(process.env.ALFRED_ABUSE_SENDER_MSGS_PER_HOUR || 20);
-const VOICE_PER_HOUR = Number(process.env.ALFRED_ABUSE_VOICE_PER_HOUR || 5);
-const DAILY_USD_CAP = Number(process.env.ALFRED_ABUSE_DAILY_USD_CAP || 20);
-const AUTO_BLOCK_STRIKES = Number(process.env.ALFRED_ABUSE_AUTO_BLOCK_STRIKES || 3);
+const GLOBAL_MSGS_PER_HOUR = Number((process.env.MAXIMUS_ABUSE_GLOBAL_MSGS_PER_HOUR || process.env.ALFRED_ABUSE_GLOBAL_MSGS_PER_HOUR) || 200);
+const SENDER_MSGS_PER_HOUR = Number((process.env.MAXIMUS_ABUSE_SENDER_MSGS_PER_HOUR || process.env.ALFRED_ABUSE_SENDER_MSGS_PER_HOUR) || 20);
+const VOICE_PER_HOUR = Number((process.env.MAXIMUS_ABUSE_VOICE_PER_HOUR || process.env.ALFRED_ABUSE_VOICE_PER_HOUR) || 5);
+const DAILY_USD_CAP = Number((process.env.MAXIMUS_ABUSE_DAILY_USD_CAP || process.env.ALFRED_ABUSE_DAILY_USD_CAP) || 20);
+const AUTO_BLOCK_STRIKES = Number((process.env.MAXIMUS_ABUSE_AUTO_BLOCK_STRIKES || process.env.ALFRED_ABUSE_AUTO_BLOCK_STRIKES) || 3);
 const VIOLATION_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -63,8 +63,8 @@ const COST_ESTIMATE_VOICE_USD = 0.15;  // Whisper + Claude + TTS
 
 // ─── In-process state ──────────────────────────────────────────────────────
 
-const BLOCKLIST_PATH = process.env.ALFRED_BLOCKLIST_PATH || "/data/blocklist.txt";
-const VIOLATIONS_LOG = process.env.ALFRED_VIOLATIONS_LOG || "/data/violations.jsonl";
+const BLOCKLIST_PATH = (process.env.MAXIMUS_BLOCKLIST_PATH || process.env.ALFRED_BLOCKLIST_PATH) || "/data/blocklist.txt";
+const VIOLATIONS_LOG = (process.env.MAXIMUS_VIOLATIONS_LOG || process.env.ALFRED_VIOLATIONS_LOG) || "/data/violations.jsonl";
 const blocklist = new Set<string>();
 let blocklistLoaded = false;
 

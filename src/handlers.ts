@@ -31,7 +31,7 @@ import { shouldAlfredRespond } from "./response-filter.js";
 import { createRateLimiter } from "./rate-limit.js";
 import { checkAbuse, alertTylerAboutAbuse } from "./abuse-protection.js";
 
-const ALFRED_PHONE = (process.env.ALFRED_PHONE || "").replace(/\D/g, "");
+const ALFRED_PHONE = ((process.env.MAXIMUS_PHONE || process.env.ALFRED_PHONE) || "").replace(/\D/g, "");
 
 const KING_ENV_VARS = ["KING_TYLER", "KING_ANTONIOS", "KING_MORGAN", "KING_ANDREW"] as const;
 
@@ -367,9 +367,9 @@ export function makeMessageHandler(deps: {
     //
     // Any other group (unknown / new) falls back to the kings policy so we
     // fail closed rather than open.
-    const opsGroupJid = process.env.ALFRED_OPS_GROUP_JID || "";
+    const opsGroupJid = (process.env.MAXIMUS_OPS_GROUP_JID || process.env.ALFRED_OPS_GROUP_JID) || "";
     const isOpsGroup = opsGroupJid !== "" && msg.groupJid === opsGroupJid;
-    const kingsGroupJid = process.env.ALFRED_KINGS_GROUP_JID || process.env.ALFRED_GROUP_JID || "";
+    const kingsGroupJid = (process.env.MAXIMUS_KINGS_GROUP_JID || process.env.ALFRED_KINGS_GROUP_JID) || (process.env.MAXIMUS_GROUP_JID || process.env.ALFRED_GROUP_JID) || "";
     const isKingsGroup = kingsGroupJid !== "" && msg.groupJid === kingsGroupJid;
 
     const { decideResponseMode } = await import("./response-filter.js");

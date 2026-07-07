@@ -8,13 +8,13 @@ const TIMEOUT_MS = 30_000;
 const VOICE_TIMEOUT_MS = 90_000;
 
 function baseUrl(): string {
-  const url = process.env.ALFRED_API_URL;
+  const url = (process.env.MAXIMUS_API_URL || process.env.ALFRED_API_URL);
   if (!url) throw new Error("ALFRED_API_URL is not set");
   return url.replace(/\/$/, "");
 }
 
 function bearer(): string {
-  const secret = process.env.ALFRED_BRIDGE_SECRET;
+  const secret = (process.env.MAXIMUS_BRIDGE_SECRET || process.env.ALFRED_BRIDGE_SECRET);
   if (!secret) throw new Error("ALFRED_BRIDGE_SECRET is not set");
   return `Bearer ${secret}`;
 }
