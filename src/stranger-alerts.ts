@@ -83,7 +83,7 @@ function shouldAlertNow(senderKey: string): boolean {
 }
 
 function buildAlertText(input: {
-  kind: "dm_to_alfred" | "wrong_group";
+  kind: "dm_to_maximus" | "wrong_group";
   fromName?: string | null;
   fromPhone?: string | null;
   fromJid: string;
@@ -113,7 +113,7 @@ function buildAlertText(input: {
     ].join("\n");
   }
 
-  if (input.kind === "dm_to_alfred") {
+  if (input.kind === "dm_to_maximus") {
     return [
       `Milord, a stranger hath sent me a private message.`,
       ``,
@@ -136,7 +136,7 @@ function buildAlertText(input: {
 
 export interface StrangerAlertInput {
   sock: WASocket;
-  kind: "dm_to_alfred" | "wrong_group";
+  kind: "dm_to_maximus" | "wrong_group";
   fromJid: string;
   fromName?: string | null;
   preview: string;

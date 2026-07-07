@@ -6,7 +6,7 @@ import { makeMessageHandler, makeButtonHandler } from "./handlers.js";
 import {
   setPresenceAvailable,
   setPresenceUnavailable,
-  getAlfredAvailabilityState,
+  getMaximusAvailabilityState,
 } from "./humanizer.js";
 import { createRateLimiter } from "./rate-limit.js";
 import { startScribeJob, getScribeStatus } from "./scribe.js";
@@ -94,11 +94,11 @@ async function main(): Promise<void> {
   // ─── Startup one-liner ──────────────────────────────────────────────
   // Anyone tailing Railway/Fly logs should see Maximus's operating mode at
   // a glance without hunting through pino JSON.
-  const alfredPhoneRaw = ((process.env.MAXIMUS_PHONE || process.env.ALFRED_PHONE) || "").replace(/\D/g, "");
-  const maskedPhone = alfredPhoneRaw
-    ? `${alfredPhoneRaw.slice(0, 2)}${"*".repeat(Math.max(0, alfredPhoneRaw.length - 4))}${alfredPhoneRaw.slice(-2)}`
+  const maximusPhoneRaw = ((process.env.MAXIMUS_PHONE || process.env.ALFRED_PHONE) || "").replace(/\D/g, "");
+  const maskedPhone = maximusPhoneRaw
+    ? `${maximusPhoneRaw.slice(0, 2)}${"*".repeat(Math.max(0, maximusPhoneRaw.length - 4))}${maximusPhoneRaw.slice(-2)}`
     : "unset";
-  const bootAvailability = getAlfredAvailabilityState();
+  const bootAvailability = getMaximusAvailabilityState();
   logger.info(
     `Maximus bridge online. Tag-only mode: ENABLED. Maximus phone: ${maskedPhone}. Group: ${groupJid || "unset"}. Availability: ${bootAvailability}.`
   );
@@ -165,8 +165,8 @@ async function main(): Promise<void> {
       return;
     }
     try {
-      const { postAlfredCatchUp, postAlfredChat } = await import("./maximus-client.js");
-      const unanswered = await postAlfredCatchUp({ hours: 6, maxMessages: 8 });
+      const { postMaximusCatchUp, postMaximusChat } = await import("./maximus-client.js");
+      const unanswered = await postMaximusCatchUp({ hours: 6, maxMessages: 8 });
       if (unanswered.length === 0) {
         logger.info("Boot catch-up: no unanswered messages found");
         return;
@@ -176,7 +176,7 @@ async function main(): Promise<void> {
       for (let i = 0; i < unanswered.length; i++) {
         const msg = unanswered[i];
         try {
-          const reply = await postAlfredChat({
+          const reply = await postMaximusChat({
             senderPhone: msg.senderPhone,
             senderName: msg.senderName,
             groupJid: groupJid,

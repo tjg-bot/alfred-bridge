@@ -126,7 +126,7 @@ function extractButtonId(msg: WAMessage): string | null {
 }
 
 interface SecurityEvent {
-  type: "dm_to_alfred" | "wrong_group";
+  type: "dm_to_maximus" | "wrong_group";
   from: string;
   fromName?: string;
   logger: Logger;
@@ -244,21 +244,21 @@ export async function startWhatsappClient(opts: StartOpts): Promise<WAClient> {
           if (!remoteJid.endsWith("@g.us")) {
             logger.warn(
               {
-                securityEvent: "dm_to_alfred",
+                securityEvent: "dm_to_maximus",
                 from: remoteJid,
                 fromName: msg.pushName,
               },
               "Ignoring 1-1 DM to Maximus - group-only enforcement"
             );
             void reportSecurityEvent({
-              type: "dm_to_alfred",
+              type: "dm_to_maximus",
               from: remoteJid,
               fromName: msg.pushName || undefined,
               logger,
             });
             void maybeAlertTylerAboutStranger({
               sock: s,
-              kind: "dm_to_alfred",
+              kind: "dm_to_maximus",
               fromJid: remoteJid,
               fromName: msg.pushName || null,
               preview: extractText(msg) || "",

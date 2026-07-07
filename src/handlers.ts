@@ -5,11 +5,11 @@ import type {
   WAClient,
 } from "./wa-client.js";
 import {
-  postAlfredChat,
-  postAlfredExecute,
-  postAlfredVoice,
+  postMaximusChat,
+  postMaximusExecute,
+  postMaximusVoice,
   postToKnowledgeBase,
-  type AlfredChatResponse,
+  type MaximusChatResponse,
 } from "./maximus-client.js";
 import { sendVoiceNote } from "./voice.js";
 import {
@@ -20,14 +20,14 @@ import {
   stopTyping,
   markMessageRead,
   maybeChunkReply,
-  isAlfredAsleep,
-  shouldAlfredIgnore,
+  isMaximusAsleep,
+  shouldMaximusIgnore,
   randomEmoji,
   reactToMessage,
   humanIntroInsertion,
-  getAlfredAvailabilityState,
+  getMaximusAvailabilityState,
 } from "./humanizer.js";
-import { shouldAlfredRespond } from "./response-filter.js";
+import { shouldMaximusRespond } from "./response-filter.js";
 import { createRateLimiter } from "./rate-limit.js";
 import { checkAbuse, alertTylerAboutAbuse } from "./abuse-protection.js";
 
@@ -275,7 +275,7 @@ export function makeMessageHandler(deps: {
 
       let voiceResult;
       try {
-        voiceResult = await postAlfredVoice({
+        voiceResult = await postMaximusVoice({
           senderPhone: effectiveKing.phone,
           senderName: effectiveKing.name,
           groupJid: msg.groupJid,
@@ -374,13 +374,13 @@ export function makeMessageHandler(deps: {
 
     const { decideResponseMode } = await import("./response-filter.js");
     const mode = decideResponseMode(msg.text);
-    const repliedToAlfred = msg.quotedFromMe === true;
+    const repliedToMaximus = msg.quotedFromMe === true;
 
     // Ops group + Kings group: force explicit mode so Maximus always speaks up.
     // The kings want visible engagement; silent-drop of greetings felt broken.
     const effectiveMode = isOpsGroup || isKingsGroup ? "explicit" : mode;
 
-    if (effectiveMode === "silent" && !repliedToAlfred) {
+    if (effectiveMode === "silent" && !repliedToMaximus) {
       logger.info(
         { king: effectiveKing.name, messageId: msg.messageId, textLen: msg.text.length, mode, isOpsGroup },
         "Message not relevant to Maximus, logging to knowledge base and staying silent"
@@ -399,11 +399,11 @@ export function makeMessageHandler(deps: {
     // Maximus is OMNIPRESENT. He never sleeps. Availability state is used
     // purely to shape the response tempo (a bit slower at night to feel
     // human), never to silence him.
-    const availability = getAlfredAvailabilityState();
+    const availability = getMaximusAvailabilityState();
 
     // ─── Probabilistic human ignore ────────────────────────────────────
     // Real humans don't respond to EVERY message directed at them.
-    if (shouldAlfredIgnore(msg.text)) {
+    if (shouldMaximusIgnore(msg.text)) {
       logger.info(
         { king: effectiveKing.name, messageId: msg.messageId, availability },
         "Maximus chose not to respond (probabilistic human ignore)"
@@ -438,7 +438,7 @@ export function makeMessageHandler(deps: {
     // Maximus is omnipresent. The old "sleep hours" concept is retained only
     // as a soft tempo hint (slightly slower typing during late-night ET).
 
-    let reply: AlfredChatResponse | null = null;
+    let reply: MaximusChatResponse | null = null;
     let lastErr: unknown = null;
     // Self-healing retry: first attempt, then a 3s backoff, then a 6s backoff.
     // Real transient errors (Vercel cold start, upstream Claude blip, brief
@@ -447,7 +447,7 @@ export function makeMessageHandler(deps: {
     // to the group instead of a canned "having a moment".
     for (let attempt = 1; attempt <= 3 && !reply; attempt++) {
       try {
-        reply = await postAlfredChat({
+        reply = await postMaximusChat({
           senderPhone: effectiveKing.phone,
           senderName: effectiveKing.name,
           groupJid: msg.groupJid,
@@ -565,7 +565,7 @@ export function makeButtonHandler(deps: {
 
     let result;
     try {
-      result = await postAlfredExecute({
+      result = await postMaximusExecute({
         actionId: payload.actionId,
         confirmed: payload.confirmed,
         senderPhone: effectiveKing.phone,

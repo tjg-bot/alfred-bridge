@@ -7,13 +7,18 @@
  * Maximus stays silent.
  *
  * A message qualifies for a response only if it:
- *   1. Contains "@alfred" (case-insensitive)
+ *   1. Contains "@maximus" (case-insensitive)
  *   2. Starts with "Maximus," / "Maximus:" / "Maximus " (case-insensitive)
- *   3. Starts with "hey alfred" / "yo alfred" / "hi alfred" (case-insensitive)
- *   4. Ends with a direct question TO Maximus (", alfred?" or ", alfred.")
+ *   3. Starts with "hey maximus" / "yo maximus" / "hi maximus" (case-insensitive)
+ *   4. Ends with a direct question TO Maximus (", maximus?" or ", maximus.")
  *   5. Is a slash command starting with "/"
  *   6. Is a reply to one of Maximus's own messages (handled separately since
  *      that check needs the WA message's quoted-message context, not text).
+ *
+ * POST-RENAME (2026-07-07): Maximus does NOT respond to "Alfred" in any form.
+ * The old name is dead and gone. Kings who slip up and type "hey alfred" get
+ * silence back, same as if they'd said any other unrelated name. Only the
+ * name "Maximus" triggers a response.
  */
 
 /**
@@ -47,12 +52,12 @@ export function decideResponseMode(text: string): ResponseDecision {
   if (raw.startsWith("/")) return "explicit";
 
   const lower = raw.toLowerCase();
-  if (lower.includes("@alfred")) return "explicit";
-  if (/^alfred[\s,:.]/i.test(raw)) return "explicit";
-  if (/^alfred$/i.test(raw)) return "explicit";
-  if (/^(hey|yo|hi|hello|yes|ok|okay)\s+alfred\b/i.test(raw)) return "explicit";
-  if (/,\s*alfred\s*[?.!]?\s*$/i.test(raw)) return "explicit";
-  if (/\balfred\b/i.test(lower)) return "explicit"; // any mention of alfred by name
+  if (lower.includes("@maximus")) return "explicit";
+  if (/^maximus[\s,:.]/i.test(raw)) return "explicit";
+  if (/^maximus$/i.test(raw)) return "explicit";
+  if (/^(hey|yo|hi|hello|yes|ok|okay)\s+maximus\b/i.test(raw)) return "explicit";
+  if (/,\s*maximus\s*[?.!]?\s*$/i.test(raw)) return "explicit";
+  if (/\bmaximus\b/i.test(lower)) return "explicit"; // any mention of Maximus by name
 
   // Relevance keywords: org-topics Maximus owns. Case-insensitive whole-word.
   const relevanceRegex = new RegExp(
@@ -90,7 +95,7 @@ export function decideResponseMode(text: string): ResponseDecision {
  * Legacy boolean wrapper. Returns true if the message triggers ANY response
  * (explicit or relevant). Preserved for existing callers.
  */
-export function shouldAlfredRespond(text: string, _myPhoneE164: string): boolean {
+export function shouldMaximusRespond(text: string, _myPhoneE164: string): boolean {
   return decideResponseMode(text) !== "silent";
 }
 
@@ -100,25 +105,35 @@ export function shouldAlfredRespond(text: string, _myPhoneE164: string): boolean
  * copy into a scratch file to check.
  *
  * Each entry: [input, expectedResult, note]
+ *
+ * Key post-rename cases: any Alfred variant must return FALSE (silent).
  */
-export const shouldAlfredRespondTestCases: Array<[string, boolean, string]> = [
+export const shouldMaximusRespondTestCases: Array<[string, boolean, string]> = [
   ["hey guys check this out", false, "casual chat, no mention"],
   ["Maximus, what's the pipeline?", true, "starts with Maximus,"],
-  ["alfred can you check the deploy", true, "starts with alfred (space)"],
   ["Maximus: run the report", true, "starts with Maximus:"],
-  ["@alfred spend report", true, "@alfred mention"],
-  ["@Maximus what's up", true, "@Maximus case variant"],
-  ["hey @alfred are you there", true, "@alfred mid-sentence"],
+  ["@Maximus what's up", true, "@Maximus mention"],
   ["/status", true, "slash command"],
   ["/spend today", true, "slash command with args"],
-  ["what do you think, alfred?", true, "trailing direct address"],
   ["that's fine, Maximus.", true, "trailing direct address period"],
-  ["hey alfred come here", true, "hey alfred opener"],
-  ["yo alfred", true, "yo alfred"],
-  ["hi alfred, quick q", true, "hi alfred opener"],
+  ["hey maximus come here", true, "hey maximus opener"],
+  ["yo maximus", true, "yo maximus"],
+  ["hi maximus, quick q", true, "hi maximus opener"],
   ["Maximus", true, "just the name"],
-  ["alfred was a butler", true, "starts with 'alfred ' - spec says respond"],
-  ["I told alfred yesterday", false, "alfred mid-sentence, no @, not opener"],
+  ["what do you think, maximus?", true, "trailing direct address"],
+  ["can you check maximus is running", true, "any mention of maximus by name"],
+
+  // POST-RENAME: Alfred variants MUST all be silent (no response)
+  ["alfred can you check the deploy", false, "starts with alfred - MUST BE SILENT post-rename"],
+  ["@alfred spend report", false, "@alfred mention - MUST BE SILENT post-rename"],
+  ["hey @alfred are you there", false, "@alfred mid-sentence - MUST BE SILENT"],
+  ["what do you think, alfred?", false, "trailing direct address to alfred - MUST BE SILENT"],
+  ["hey alfred come here", false, "hey alfred opener - MUST BE SILENT"],
+  ["yo alfred", false, "yo alfred - MUST BE SILENT"],
+  ["hi alfred, quick q", false, "hi alfred opener - MUST BE SILENT"],
+  ["alfred was a butler", false, "starts with alfred - MUST BE SILENT post-rename"],
+  ["I told alfred yesterday", false, "alfred mid-sentence - MUST BE SILENT"],
+
   ["lol", false, "short reaction"],
   ["can someone check on this", false, "general question, no address"],
   ["", false, "empty string"],

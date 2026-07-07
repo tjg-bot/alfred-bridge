@@ -138,7 +138,7 @@ export async function markMessageRead(
  * Real humans sleep - so should Maximus (for the appearance of humanity).
  * Returns true if Maximus is currently "asleep".
  */
-export function isAlfredAsleep(now: Date = new Date()): boolean {
+export function isMaximusAsleep(now: Date = new Date()): boolean {
   // Toronto (ET) hours. Simple offset - assumes system clock is UTC.
   // TODO: proper timezone handling via Intl.DateTimeFormat when needed.
   const etOffsetHours = isDaylightSavings(now) ? -4 : -5;
@@ -206,7 +206,7 @@ export function maybeChunkReply(text: string): string[] {
  *
  * @param text - the incoming message text
  */
-export function shouldAlfredIgnore(text: string): boolean {
+export function shouldMaximusIgnore(text: string): boolean {
   const trimmed = (text || "").trim();
   if (!trimmed) return false;
   const len = trimmed.length;
@@ -215,11 +215,13 @@ export function shouldAlfredIgnore(text: string): boolean {
   // him OR referenced ABOUT him in third person), NEVER ignore. Kings want
   // him to weigh in - dry aside, playful pushback, quick fact. Silence is a
   // failure of office when he is named.
-  if (/\balfred\b/i.test(trimmed)) return false;
+  // POST-RENAME 2026-07-07: Only matches "maximus". Old identity "alfred" is
+  // dead; if a king types Alfred by accident, Maximus stays silent.
+  if (/\bmaximus\b/i.test(trimmed)) return false;
 
   // Tagged direct questions or slash commands always get a reply - never ignore.
   if (trimmed.startsWith("/")) return false;
-  if (/@alfred/i.test(trimmed)) return false;
+  if (/@maximus/i.test(trimmed)) return false;
   if (trimmed.endsWith("?")) return false;
 
   if (len < 20) {
@@ -298,9 +300,9 @@ export function humanIntroInsertion(text: string): string {
  *   afk:     6:45am-8am ET -> rare responses, briefer
  *   asleep:  11pm-6:45am ET -> silent unless emergency slash command
  */
-export type AlfredAvailability = "active" | "busy" | "afk" | "asleep";
+export type MaximusAvailability = "active" | "busy" | "afk" | "asleep";
 
-export function getAlfredAvailabilityState(now: Date = new Date()): AlfredAvailability {
+export function getMaximusAvailabilityState(now: Date = new Date()): MaximusAvailability {
   const etOffsetHours = isDaylightSavings(now) ? -4 : -5;
   const localHour = (now.getUTCHours() + etOffsetHours + 24) % 24;
   const localMinute = now.getUTCMinutes();

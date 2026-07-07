@@ -198,7 +198,7 @@ export async function alertTylerAboutAbuse(input: {
   const fromJid = `${input.senderPhone}@s.whatsapp.net`;
   await maybeAlertTylerAboutStranger({
     sock: input.sock,
-    kind: "dm_to_alfred",
+    kind: "dm_to_maximus",
     fromJid,
     fromName: input.senderName ?? null,
     preview: `[ABUSE-GATE] ${input.reason}. ${input.preview ? `Last msg: "${input.preview}"` : ""}`,

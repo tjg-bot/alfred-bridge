@@ -29,7 +29,7 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = TIME
   }
 }
 
-export interface AlfredChatResponse {
+export interface MaximusChatResponse {
   text: string;
   pendingAction?: { id: string; displayText: string } | null;
   errorMessage?: string;
@@ -40,13 +40,13 @@ export interface AlfredExecuteResponse {
   status?: string;
 }
 
-export async function postAlfredChat(opts: {
+export async function postMaximusChat(opts: {
   senderPhone: string;
   senderName: string;
   groupJid: string;
   text: string;
   messageId: string;
-}): Promise<AlfredChatResponse> {
+}): Promise<MaximusChatResponse> {
   const url = `${baseUrl()}/api/alfred/bridge/chat`;
   const res = await fetchWithTimeout(url, {
     method: "POST",
@@ -63,7 +63,7 @@ export async function postAlfredChat(opts: {
     throw new Error(`Maximus chat failed: ${res.status}`);
   }
 
-  return (await res.json()) as AlfredChatResponse;
+  return (await res.json()) as MaximusChatResponse;
 }
 
 export interface AlfredVoiceResponse {
@@ -81,7 +81,7 @@ export interface AlfredVoiceResponse {
  * Maximus's chat, and returns the reply text + (usually) an opus audio blob
  * for the bridge to send back as a WhatsApp voice note.
  */
-export async function postAlfredVoice(opts: {
+export async function postMaximusVoice(opts: {
   senderPhone: string;
   senderName: string;
   groupJid: string;
@@ -112,7 +112,7 @@ export async function postAlfredVoice(opts: {
   return (await res.json()) as AlfredVoiceResponse;
 }
 
-export async function postAlfredExecute(opts: {
+export async function postMaximusExecute(opts: {
   actionId: string;
   confirmed: boolean;
   senderPhone: string;
@@ -209,7 +209,7 @@ export interface UnansweredMessage {
  * on bridge boot so Maximus can catch up like a person returning to their
  * phone. Bridge then replies to each with human pacing.
  */
-export async function postAlfredCatchUp(opts: {
+export async function postMaximusCatchUp(opts: {
   hours?: number;
   maxMessages?: number;
 }): Promise<UnansweredMessage[]> {
@@ -227,7 +227,7 @@ export async function postAlfredCatchUp(opts: {
     const data = (await res.json()) as { unanswered?: UnansweredMessage[] };
     return Array.isArray(data.unanswered) ? data.unanswered : [];
   } catch (err) {
-    logger.warn({ err }, "postAlfredCatchUp failed - continuing without catch-up");
+    logger.warn({ err }, "postMaximusCatchUp failed - continuing without catch-up");
     return [];
   }
 }
