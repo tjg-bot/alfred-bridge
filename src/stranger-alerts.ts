@@ -1,8 +1,8 @@
 /**
  * Stranger-alert path.
  *
- * When someone Alfred doesn't recognise reaches out (a DM to his number, or
- * a message in a group that isn't allow-listed), Alfred stays silent to
+ * When someone Maximus doesn't recognise reaches out (a DM to his number, or
+ * a message in a group that isn't allow-listed), Maximus stays silent to
  * THEM (never reveals his presence) but sends Tyler a direct WhatsApp
  * message with context so Tyler can decide whether to engage. Includes
  * per-sender dedup and a global cap so a spammer can't flood Tyler.

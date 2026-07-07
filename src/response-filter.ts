@@ -1,42 +1,42 @@
 /**
- * Response filter - decides whether Alfred should reply to a given message.
+ * Response filter - decides whether Maximus should reply to a given message.
  *
- * Alfred lives in a group chat with the founding kings. He should behave like
+ * Maximus lives in a group chat with the founding kings. He should behave like
  * a real human colleague: only speaking up when explicitly addressed. Every
  * other message is still logged to the FK knowledge base for context, but
- * Alfred stays silent.
+ * Maximus stays silent.
  *
  * A message qualifies for a response only if it:
  *   1. Contains "@alfred" (case-insensitive)
- *   2. Starts with "Alfred," / "Alfred:" / "Alfred " (case-insensitive)
+ *   2. Starts with "Maximus," / "Maximus:" / "Maximus " (case-insensitive)
  *   3. Starts with "hey alfred" / "yo alfred" / "hi alfred" (case-insensitive)
- *   4. Ends with a direct question TO Alfred (", alfred?" or ", alfred.")
+ *   4. Ends with a direct question TO Maximus (", alfred?" or ", alfred.")
  *   5. Is a slash command starting with "/"
- *   6. Is a reply to one of Alfred's own messages (handled separately since
+ *   6. Is a reply to one of Maximus's own messages (handled separately since
  *      that check needs the WA message's quoted-message context, not text).
  */
 
 /**
- * Returns true if the given group message text is addressed to Alfred and
- * should trigger a reply. False means Alfred stays silent.
+ * Returns true if the given group message text is addressed to Maximus and
+ * should trigger a reply. False means Maximus stays silent.
  *
  * @param text - the incoming message text (already trimmed by caller)
- * @param _myPhoneE164 - Alfred's own phone in E.164 digits-only form.
+ * @param _myPhoneE164 - Maximus's own phone in E.164 digits-only form.
  *                      Reserved for future self-mention matching by phone.
  */
 export type ResponseDecision = "explicit" | "relevant" | "silent";
 
 /**
- * Decides Alfred's response mode for an incoming message.
+ * Decides Maximus's response mode for an incoming message.
  *
- * "explicit"  - Alfred is directly named or given a slash command. He MUST
+ * "explicit"  - Maximus is directly named or given a slash command. He MUST
  *               respond promptly and helpfully.
- * "relevant"  - Message mentions an org topic Alfred owns (ads, bookings,
+ * "relevant"  - Message mentions an org topic Maximus owns (ads, bookings,
  *               prospects, spend, sentinel, security, deploys, kings, etc).
- *               Alfred is invited to consider whether to add value. The FK
- *               server-side prompt tells Alfred he may STAY SILENT if he
+ *               Maximus is invited to consider whether to add value. The FK
+ *               server-side prompt tells Maximus he may STAY SILENT if he
  *               has nothing to add; otherwise he weighs in with judgment.
- * "silent"    - Neither of the above. Alfred still logs to knowledge base
+ * "silent"    - Neither of the above. Maximus still logs to knowledge base
  *               but does not respond.
  */
 export function decideResponseMode(text: string): ResponseDecision {
@@ -54,7 +54,7 @@ export function decideResponseMode(text: string): ResponseDecision {
   if (/,\s*alfred\s*[?.!]?\s*$/i.test(raw)) return "explicit";
   if (/\balfred\b/i.test(lower)) return "explicit"; // any mention of alfred by name
 
-  // Relevance keywords: org-topics Alfred owns. Case-insensitive whole-word.
+  // Relevance keywords: org-topics Maximus owns. Case-insensitive whole-word.
   const relevanceRegex = new RegExp(
     "\\b(" +
       [
@@ -103,20 +103,20 @@ export function shouldAlfredRespond(text: string, _myPhoneE164: string): boolean
  */
 export const shouldAlfredRespondTestCases: Array<[string, boolean, string]> = [
   ["hey guys check this out", false, "casual chat, no mention"],
-  ["Alfred, what's the pipeline?", true, "starts with Alfred,"],
+  ["Maximus, what's the pipeline?", true, "starts with Maximus,"],
   ["alfred can you check the deploy", true, "starts with alfred (space)"],
-  ["Alfred: run the report", true, "starts with Alfred:"],
+  ["Maximus: run the report", true, "starts with Maximus:"],
   ["@alfred spend report", true, "@alfred mention"],
-  ["@Alfred what's up", true, "@Alfred case variant"],
+  ["@Maximus what's up", true, "@Maximus case variant"],
   ["hey @alfred are you there", true, "@alfred mid-sentence"],
   ["/status", true, "slash command"],
   ["/spend today", true, "slash command with args"],
   ["what do you think, alfred?", true, "trailing direct address"],
-  ["that's fine, Alfred.", true, "trailing direct address period"],
+  ["that's fine, Maximus.", true, "trailing direct address period"],
   ["hey alfred come here", true, "hey alfred opener"],
   ["yo alfred", true, "yo alfred"],
   ["hi alfred, quick q", true, "hi alfred opener"],
-  ["Alfred", true, "just the name"],
+  ["Maximus", true, "just the name"],
   ["alfred was a butler", true, "starts with 'alfred ' - spec says respond"],
   ["I told alfred yesterday", false, "alfred mid-sentence, no @, not opener"],
   ["lol", false, "short reaction"],

@@ -31,7 +31,7 @@ const BROADCAST_RATE_LIMIT = createRateLimiter({
   maxRequests: 30,
 });
 
-// Track the last text Alfred broadcast so we can reject accidental duplicates.
+// Track the last text Maximus broadcast so we can reject accidental duplicates.
 let lastBroadcastText: string | null = null;
 let lastBroadcastDedupeKey: string | null = null;
 
@@ -49,7 +49,7 @@ function sanitizeBroadcastText(raw: string): string {
 }
 
 function requiredEnv(name: string): string {
-  // During Alfred -> Maximus rename we accept either MAXIMUS_ or ALFRED_
+  // During Maximus -> Maximus rename we accept either MAXIMUS_ or ALFRED_
   // prefix. If the caller passes an ALFRED_ name, check MAXIMUS_ first.
   const maximusName = name.startsWith("ALFRED_") ? "MAXIMUS_" + name.slice("ALFRED_".length) : name;
   const val = process.env[maximusName] || process.env[name];
@@ -92,7 +92,7 @@ async function main(): Promise<void> {
   }
 
   // ─── Startup one-liner ──────────────────────────────────────────────
-  // Anyone tailing Railway/Fly logs should see Alfred's operating mode at
+  // Anyone tailing Railway/Fly logs should see Maximus's operating mode at
   // a glance without hunting through pino JSON.
   const alfredPhoneRaw = ((process.env.MAXIMUS_PHONE || process.env.ALFRED_PHONE) || "").replace(/\D/g, "");
   const maskedPhone = alfredPhoneRaw
@@ -100,7 +100,7 @@ async function main(): Promise<void> {
     : "unset";
   const bootAvailability = getAlfredAvailabilityState();
   logger.info(
-    `Alfred bridge online. Tag-only mode: ENABLED. Alfred phone: ${maskedPhone}. Group: ${groupJid || "unset"}. Availability: ${bootAvailability}.`
+    `Maximus bridge online. Tag-only mode: ENABLED. Maximus phone: ${maskedPhone}. Group: ${groupJid || "unset"}. Availability: ${bootAvailability}.`
   );
 
   // Holder pattern lets handlers reference the client that is being built.
@@ -125,7 +125,7 @@ async function main(): Promise<void> {
     logger,
   });
 
-  // OMNIPRESENCE (hard rule): Alfred is always available. No sleep-hour gate,
+  // OMNIPRESENCE (hard rule): Maximus is always available. No sleep-hour gate,
   // no overnight offline. Only exception is the occasional 2% micro-AFK during
   // the day so his presence isn't a suspicious flat line - real humans put
   // their phone down for a minute here and there.
@@ -151,11 +151,11 @@ async function main(): Promise<void> {
   setTimeout(() => {
     if (!wa?.sock) return;
     void setPresenceAvailable(wa.sock);
-    logger.info("Alfred set to available at boot (omnipresence mode - no sleep gate)");
+    logger.info("Maximus set to available at boot (omnipresence mode - no sleep gate)");
   }, 5000);
 
   // Catch-up sweep on boot: query FK for king messages that were addressed to
-  // Alfred in the last 6 hours but never got a reply. Post responses to each,
+  // Maximus in the last 6 hours but never got a reply. Post responses to each,
   // one at a time, with human pacing (30-90 sec between messages) so it feels
   // like a person catching up on missed threads. Fire after WhatsApp is
   // stable (30 sec after boot).
@@ -165,7 +165,7 @@ async function main(): Promise<void> {
       return;
     }
     try {
-      const { postAlfredCatchUp, postAlfredChat } = await import("./alfred-client.js");
+      const { postAlfredCatchUp, postAlfredChat } = await import("./maximus-client.js");
       const unanswered = await postAlfredCatchUp({ hours: 6, maxMessages: 8 });
       if (unanswered.length === 0) {
         logger.info("Boot catch-up: no unanswered messages found");
@@ -282,7 +282,7 @@ async function main(): Promise<void> {
     ) {
       logger.warn(
         { textPreview: text.slice(0, 60), dedupeKey },
-        "Broadcast rejected: identical to last message Alfred sent"
+        "Broadcast rejected: identical to last message Maximus sent"
       );
       res.status(400).json({ error: "duplicate of last broadcast" });
       return;
@@ -393,7 +393,7 @@ async function main(): Promise<void> {
   });
 
   const server = app.listen(port, () => {
-    logger.info({ port }, "Alfred bridge HTTP server listening");
+    logger.info({ port }, "Maximus bridge HTTP server listening");
   });
 
   const shutdown = (signal: string) => {

@@ -2,7 +2,7 @@ import { logger } from "./logger.js";
 
 const TIMEOUT_MS = 30_000;
 // Voice endpoint needs a much larger window: Whisper transcription (~5s for
-// short notes, up to 30s for 5 min audio) + Alfred chat (~10-30s) + optional
+// short notes, up to 30s for 5 min audio) + Maximus chat (~10-30s) + optional
 // TTS synthesis (~5-20s). 90 sec buffer keeps most cases safe without letting
 // a hung upstream stall the bridge forever.
 const VOICE_TIMEOUT_MS = 90_000;
@@ -59,8 +59,8 @@ export async function postAlfredChat(opts: {
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    logger.error({ status: res.status, body }, "Alfred chat endpoint returned non-2xx");
-    throw new Error(`Alfred chat failed: ${res.status}`);
+    logger.error({ status: res.status, body }, "Maximus chat endpoint returned non-2xx");
+    throw new Error(`Maximus chat failed: ${res.status}`);
   }
 
   return (await res.json()) as AlfredChatResponse;
@@ -78,7 +78,7 @@ export interface AlfredVoiceResponse {
 
 /**
  * POST a voice note to FK's voice endpoint. FK transcribes via Whisper, runs
- * Alfred's chat, and returns the reply text + (usually) an opus audio blob
+ * Maximus's chat, and returns the reply text + (usually) an opus audio blob
  * for the bridge to send back as a WhatsApp voice note.
  */
 export async function postAlfredVoice(opts: {
@@ -105,8 +105,8 @@ export async function postAlfredVoice(opts: {
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    logger.error({ status: res.status, body }, "Alfred voice endpoint returned non-2xx");
-    throw new Error(`Alfred voice failed: ${res.status}`);
+    logger.error({ status: res.status, body }, "Maximus voice endpoint returned non-2xx");
+    throw new Error(`Maximus voice failed: ${res.status}`);
   }
 
   return (await res.json()) as AlfredVoiceResponse;
@@ -129,8 +129,8 @@ export async function postAlfredExecute(opts: {
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    logger.error({ status: res.status, body }, "Alfred execute endpoint returned non-2xx");
-    throw new Error(`Alfred execute failed: ${res.status}`);
+    logger.error({ status: res.status, body }, "Maximus execute endpoint returned non-2xx");
+    throw new Error(`Maximus execute failed: ${res.status}`);
   }
 
   return (await res.json()) as AlfredExecuteResponse;
@@ -138,9 +138,9 @@ export async function postAlfredExecute(opts: {
 
 /**
  * Best-effort silent log of a group message to FK's knowledge base. Used for
- * messages that Alfred is NOT going to respond to (tag-only mode). Never
+ * messages that Maximus is NOT going to respond to (tag-only mode). Never
  * throws - if the endpoint is missing or unreachable, we log locally and
- * move on. Alfred's silence is the whole point of this path.
+ * move on. Maximus's silence is the whole point of this path.
  */
 export async function postToKnowledgeBase(opts: {
   senderPhone: string;
@@ -205,8 +205,8 @@ export interface UnansweredMessage {
 }
 
 /**
- * Ask FK which king messages went unanswered while Alfred was offline. Used
- * on bridge boot so Alfred can catch up like a person returning to their
+ * Ask FK which king messages went unanswered while Maximus was offline. Used
+ * on bridge boot so Maximus can catch up like a person returning to their
  * phone. Bridge then replies to each with human pacing.
  */
 export async function postAlfredCatchUp(opts: {

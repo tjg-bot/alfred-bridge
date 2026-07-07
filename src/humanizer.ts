@@ -1,6 +1,6 @@
 /**
- * Humanizer - makes Alfred's WhatsApp behaviour look more like a real person
- * and less like an automated bot. This is the "Alfred Never Dies" plan Layer 1.
+ * Humanizer - makes Maximus's WhatsApp behaviour look more like a real person
+ * and less like an automated bot. This is the "Maximus Never Dies" plan Layer 1.
  *
  * WhatsApp's bot detection looks for:
  *   - Instant replies (real humans take seconds to compose)
@@ -10,7 +10,7 @@
  *   - Uniform message length (real humans vary)
  *   - Cron-precise timing (real humans send at irregular intervals)
  *
- * All the functions here inject natural randomness into Alfred's behaviour.
+ * All the functions here inject natural randomness into Maximus's behaviour.
  */
 
 import type { WASocket } from "@whiskeysockets/baileys";
@@ -23,13 +23,13 @@ import type { WASocket } from "@whiskeysockets/baileys";
  * Adds natural variance so consecutive replies don't land at identical intervals.
  */
 export async function humanReplyDelay(replyText: string): Promise<void> {
-  // Tuned tight: natural human pause but not sluggish. Alfred is at the top
+  // Tuned tight: natural human pause but not sluggish. Maximus is at the top
   // of his game, not typing on a flip phone.
   const words = replyText.trim().split(/\s+/).length;
   // Base thinking time (how long before starting to type)
   const thinkMs = 800 + Math.random() * 1700; // 0.8-2.5 sec
   // Typing time - scale with reply length, capped tighter than before.
-  // Alfred is a professional; he types quickly, not laboriously.
+  // Maximus is a professional; he types quickly, not laboriously.
   const typingSeconds = Math.max(1.5, Math.min(12, words * 0.15));
   const typingJitter = 0.8 + Math.random() * 0.4; // 0.8x - 1.2x jitter
   const typingMs = typingSeconds * 1000 * typingJitter;
@@ -42,7 +42,7 @@ export async function humanReplyDelay(replyText: string): Promise<void> {
  * instantly read every ping. 2-15 sec.
  */
 export async function humanReadDelay(): Promise<void> {
-  // Tightened: 1-4 sec. Alfred reads promptly but not instantly.
+  // Tightened: 1-4 sec. Maximus reads promptly but not instantly.
   await sleep(1000 + Math.random() * 3000);
 }
 
@@ -62,7 +62,7 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Show "typing..." to the group. WhatsApp shows this in real-time so recipients
- * see Alfred composing before the message lands - major bot-detection signal
+ * see Maximus composing before the message lands - major bot-detection signal
  * mitigator.
  */
 export async function showTyping(sock: WASocket, jid: string): Promise<void> {
@@ -86,7 +86,7 @@ export async function stopTyping(sock: WASocket, jid: string): Promise<void> {
 }
 
 /**
- * Mark Alfred as offline. Called during "sleep hours" so Alfred isn't
+ * Mark Maximus as offline. Called during "sleep hours" so Maximus isn't
  * always-online (a bot dead giveaway). Real people go offline overnight.
  */
 export async function setPresenceUnavailable(sock: WASocket): Promise<void> {
@@ -98,7 +98,7 @@ export async function setPresenceUnavailable(sock: WASocket): Promise<void> {
 }
 
 /**
- * Mark Alfred as available. Called during business hours.
+ * Mark Maximus as available. Called during business hours.
  */
 export async function setPresenceAvailable(sock: WASocket): Promise<void> {
   try {
@@ -133,17 +133,17 @@ export async function markMessageRead(
 // ─── Sleep hours ───────────────────────────────────────────────────────────
 
 /**
- * Alfred sleeps roughly 11pm-7am ET local time. During sleep hours he still
+ * Maximus sleeps roughly 11pm-7am ET local time. During sleep hours he still
  * receives messages but delays outbound broadcasts and doesn't show typing.
- * Real humans sleep - so should Alfred (for the appearance of humanity).
- * Returns true if Alfred is currently "asleep".
+ * Real humans sleep - so should Maximus (for the appearance of humanity).
+ * Returns true if Maximus is currently "asleep".
  */
 export function isAlfredAsleep(now: Date = new Date()): boolean {
   // Toronto (ET) hours. Simple offset - assumes system clock is UTC.
   // TODO: proper timezone handling via Intl.DateTimeFormat when needed.
   const etOffsetHours = isDaylightSavings(now) ? -4 : -5;
   const localHour = (now.getUTCHours() + etOffsetHours + 24) % 24;
-  // Sleep: 11pm - 6:45am with a bit of jitter (some nights Alfred stays up)
+  // Sleep: 11pm - 6:45am with a bit of jitter (some nights Maximus stays up)
   const random = Math.random();
   const isCoreSleep = localHour >= 23 || localHour < 6;
   const isEdge = localHour === 6 && random < 0.5;
@@ -195,7 +195,7 @@ export function maybeChunkReply(text: string): string[] {
 
 /**
  * Probabilistic "human ignore" filter. Real people in a group chat don't
- * respond to every message directed at them. Returns true when Alfred
+ * respond to every message directed at them. Returns true when Maximus
  * should stay silent even if the message would otherwise qualify for a
  * reply.
  *
@@ -211,7 +211,7 @@ export function shouldAlfredIgnore(text: string): boolean {
   if (!trimmed) return false;
   const len = trimmed.length;
 
-  // Hyperaware: if Alfred's name appears anywhere in the message (spoken TO
+  // Hyperaware: if Maximus's name appears anywhere in the message (spoken TO
   // him OR referenced ABOUT him in third person), NEVER ignore. Kings want
   // him to weigh in - dry aside, playful pushback, quick fact. Silence is a
   // failure of office when he is named.
@@ -235,7 +235,7 @@ export function shouldAlfredIgnore(text: string): boolean {
 }
 
 /**
- * Occasionally return a WhatsApp REACTION emoji so Alfred can react to a
+ * Occasionally return a WhatsApp REACTION emoji so Maximus can react to a
  * king's message like a real person would. This is the ONE place emojis
  * are allowed - WhatsApp reactions ARE emojis by API design, not text
  * output. Returns null most of the time (95%).
@@ -290,7 +290,7 @@ export function humanIntroInsertion(text: string): string {
 // ─── Availability state ────────────────────────────────────────────────────
 
 /**
- * Alfred's high-level availability. Real people cycle through activity
+ * Maximus's high-level availability. Real people cycle through activity
  * states across the day - "always online" is a bot tell.
  *
  *   active:  9am-6pm ET  -> full response

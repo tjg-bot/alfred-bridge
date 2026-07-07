@@ -22,9 +22,9 @@ export interface GroupMessagePayload {
   messageId: string;
   groupJid: string;
   /** JID (bare, no resource) of the participant whose message this one quotes,
-   *  if any. Used to detect direct replies to Alfred's own messages. */
+   *  if any. Used to detect direct replies to Maximus's own messages. */
   quotedParticipant?: string | null;
-  /** True if the quoted message was sent by Alfred himself. */
+  /** True if the quoted message was sent by Maximus himself. */
   quotedFromMe?: boolean;
   /** Raw Baileys message key (used for reactions). */
   key?: {
@@ -87,7 +87,7 @@ function extractText(msg: WAMessage): string | null {
 
 /**
  * Pull the quoted-message context (if any) out of a Baileys message. Used to
- * detect direct replies to Alfred's own messages.
+ * detect direct replies to Maximus's own messages.
  * Returns null if the message is not a reply.
  */
 function extractQuotedContext(msg: WAMessage): { participant: string | null; fromMe: boolean } | null {
@@ -185,7 +185,7 @@ export async function startWhatsappClient(opts: StartOpts): Promise<WAClient> {
       auth: state,
       printQRInTerminal: false,
       logger: logger as unknown as Parameters<typeof makeWASocket>[0]["logger"],
-      browser: ["Alfred", "Chrome", "1.0.0"],
+      browser: ["Maximus", "Chrome", "1.0.0"],
       markOnlineOnConnect: false,
     });
 
@@ -237,7 +237,7 @@ export async function startWhatsappClient(opts: StartOpts): Promise<WAClient> {
 
           const remoteJid = msg.key.remoteJid || "";
 
-          // Group-only enforcement: Alfred must never respond to a 1-1 DM.
+          // Group-only enforcement: Maximus must never respond to a 1-1 DM.
           // If a message arrives from a non-group JID (no @g.us suffix), we
           // log it as a security event, DM Tyler about the stranger (rate-
           // limited so spam doesn't flood him), and drop the message.
@@ -248,7 +248,7 @@ export async function startWhatsappClient(opts: StartOpts): Promise<WAClient> {
                 from: remoteJid,
                 fromName: msg.pushName,
               },
-              "Ignoring 1-1 DM to Alfred - group-only enforcement"
+              "Ignoring 1-1 DM to Maximus - group-only enforcement"
             );
             void reportSecurityEvent({
               type: "dm_to_alfred",
@@ -389,7 +389,7 @@ export async function startWhatsappClient(opts: StartOpts): Promise<WAClient> {
           if (!text || !text.trim()) continue;
 
           const quoted = extractQuotedContext(msg);
-          // Determine if the quoted message was authored by Alfred (this
+          // Determine if the quoted message was authored by Maximus (this
           // socket's own user). Baileys exposes the socket's user JID on
           // `s.user.id` in the form "<phone>:device@s.whatsapp.net".
           let quotedFromMe = quoted?.fromMe ?? false;

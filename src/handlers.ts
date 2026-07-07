@@ -10,7 +10,7 @@ import {
   postAlfredVoice,
   postToKnowledgeBase,
   type AlfredChatResponse,
-} from "./alfred-client.js";
+} from "./maximus-client.js";
 import { sendVoiceNote } from "./voice.js";
 import {
   humanReplyDelay,
@@ -59,12 +59,12 @@ function normalizePhone(raw: string): string {
 }
 
 const ERR_TRY_AGAIN =
-  "Alfred is having a moment. Try again in 30 seconds.";
+  "Maximus is having a moment. Try again in 30 seconds.";
 
 const RATE_LIMIT_REPLY =
-  "Alfred needs a moment. Too many rapid messages from thy hand.";
+  "Maximus needs a moment. Too many rapid messages from thy hand.";
 
-// notAuthorizedMessage removed - HARD RULE that Alfred never tells anyone
+// notAuthorizedMessage removed - HARD RULE that Maximus never tells anyone
 // they are "not on the founding kings list". Anyone reaching the bridge from
 // the founding-kings group IS a king by definition.
 
@@ -85,7 +85,7 @@ const GLOBAL_LIMIT = createRateLimiter({
 // rest until the window resets).
 const rateLimitWarningSent = new Map<string, number>();
 
-// Global pause: when the global limit trips, pause all Alfred outbound
+// Global pause: when the global limit trips, pause all Maximus outbound
 // responses for 30 sec to protect the account.
 let globalPauseUntil = 0;
 
@@ -155,7 +155,7 @@ export function makeMessageHandler(deps: {
       globalPauseUntil = now + 30_000;
       logger.error(
         { messageId: msg.messageId, pausedForMs: 30_000 },
-        "GLOBAL rate limit tripped - pausing all Alfred responses for 30 sec to protect account"
+        "GLOBAL rate limit tripped - pausing all Maximus responses for 30 sec to protect account"
       );
       return;
     }
@@ -210,7 +210,7 @@ export function makeMessageHandler(deps: {
     }
 
     // HARD RULE: anyone in the founding kings group is a king by definition.
-    // The group is closed - only the 4 kings + Alfred are members. We do NOT
+    // The group is closed - only the 4 kings + Maximus are members. We do NOT
     // gate on phone-number match. If the sender's phone isn't in the env
     // registry, we still treat them as a king and use their WhatsApp display
     // name as the identity we forward to FK.
@@ -232,7 +232,7 @@ export function makeMessageHandler(deps: {
           retryAfterMs: senderCheck.retryAfterMs,
           alreadyWarned,
         },
-        "Per-sender rate limit exceeded, not invoking Alfred"
+        "Per-sender rate limit exceeded, not invoking Maximus"
       );
       if (!alreadyWarned) {
         rateLimitWarningSent.set(phone, Date.now());
@@ -284,7 +284,7 @@ export function makeMessageHandler(deps: {
           messageId: msg.messageId,
         });
       } catch (err) {
-        logger.error({ err }, "Alfred voice call failed");
+        logger.error({ err }, "Maximus voice call failed");
         try {
           await wa.sendGroupMessage(msg.groupJid, ERR_TRY_AGAIN);
         } catch (sendErr) {
@@ -355,14 +355,14 @@ export function makeMessageHandler(deps: {
     // ─── Response filter (per-group policy) ─────────────────────────────
     // Two different policies depending on which group this came from:
     //
-    //   KINGS group  -> tag-or-relevant mode. Alfred stays quiet for pure
+    //   KINGS group  -> tag-or-relevant mode. Maximus stays quiet for pure
     //                   background chat because the kings don't want their
     //                   council spammed. Explicit tag + relevant-topic
     //                   messages still get through.
     //
     //   OPS group    -> always respond. Staff (Danlyn, Dhei) need visible
-    //                   engagement from Alfred so instructions land. If they
-    //                   say "noted" or "done" Alfred replies with a crisp
+    //                   engagement from Maximus so instructions land. If they
+    //                   say "noted" or "done" Maximus replies with a crisp
     //                   professional ack. No butler voice here - staff tone.
     //
     // Any other group (unknown / new) falls back to the kings policy so we
@@ -376,14 +376,14 @@ export function makeMessageHandler(deps: {
     const mode = decideResponseMode(msg.text);
     const repliedToAlfred = msg.quotedFromMe === true;
 
-    // Ops group + Kings group: force explicit mode so Alfred always speaks up.
+    // Ops group + Kings group: force explicit mode so Maximus always speaks up.
     // The kings want visible engagement; silent-drop of greetings felt broken.
     const effectiveMode = isOpsGroup || isKingsGroup ? "explicit" : mode;
 
     if (effectiveMode === "silent" && !repliedToAlfred) {
       logger.info(
         { king: effectiveKing.name, messageId: msg.messageId, textLen: msg.text.length, mode, isOpsGroup },
-        "Message not relevant to Alfred, logging to knowledge base and staying silent"
+        "Message not relevant to Maximus, logging to knowledge base and staying silent"
       );
       await postToKnowledgeBase({
         senderPhone: effectiveKing.phone,
@@ -396,7 +396,7 @@ export function makeMessageHandler(deps: {
     }
 
     // ─── Availability state (informational only) ────────────────────────
-    // Alfred is OMNIPRESENT. He never sleeps. Availability state is used
+    // Maximus is OMNIPRESENT. He never sleeps. Availability state is used
     // purely to shape the response tempo (a bit slower at night to feel
     // human), never to silence him.
     const availability = getAlfredAvailabilityState();
@@ -406,7 +406,7 @@ export function makeMessageHandler(deps: {
     if (shouldAlfredIgnore(msg.text)) {
       logger.info(
         { king: effectiveKing.name, messageId: msg.messageId, availability },
-        "Alfred chose not to respond (probabilistic human ignore)"
+        "Maximus chose not to respond (probabilistic human ignore)"
       );
       // Still log the message so the knowledge base sees it.
       await postToKnowledgeBase({
@@ -421,7 +421,7 @@ export function makeMessageHandler(deps: {
 
     logger.info(
       { king: effectiveKing.name, textLen: msg.text.length, messageId: msg.messageId, availability },
-      "Forwarding message to Alfred"
+      "Forwarding message to Maximus"
     );
 
     // Humanizer step 1: natural read delay before marking as read.
@@ -435,7 +435,7 @@ export function makeMessageHandler(deps: {
       // Non-fatal
     }
 
-    // Alfred is omnipresent. The old "sleep hours" concept is retained only
+    // Maximus is omnipresent. The old "sleep hours" concept is retained only
     // as a soft tempo hint (slightly slower typing during late-night ET).
 
     let reply: AlfredChatResponse | null = null;
@@ -456,7 +456,7 @@ export function makeMessageHandler(deps: {
         });
       } catch (err) {
         lastErr = err;
-        logger.warn({ err, attempt }, "Alfred chat call failed - will retry if attempts remain");
+        logger.warn({ err, attempt }, "Maximus chat call failed - will retry if attempts remain");
         if (attempt < 3) {
           await new Promise((r) => setTimeout(r, attempt * 3000));
         }
@@ -464,7 +464,7 @@ export function makeMessageHandler(deps: {
     }
     if (!reply) {
       const errMsg = lastErr instanceof Error ? lastErr.message : String(lastErr || "unknown");
-      logger.error({ lastErr }, "Alfred chat call failed after 3 attempts");
+      logger.error({ lastErr }, "Maximus chat call failed after 3 attempts");
       const humanExplain = errMsg.includes("401") || errMsg.toLowerCase().includes("unauthorized")
         ? "Mine credentials are out of sync with the wire - Tyler must refresh ALFRED_BRIDGE_SECRET on Vercel."
         : errMsg.includes("500") || errMsg.includes("502") || errMsg.includes("503") || errMsg.includes("504")
@@ -483,7 +483,7 @@ export function makeMessageHandler(deps: {
     let outText = reply.text || reply.errorMessage || "";
 
     // Sprinkle a tiny natural filler ~15% of the time on longer replies so
-    // Alfred sounds like a person mid-thought, not a rehearsed bot.
+    // Maximus sounds like a person mid-thought, not a rehearsed bot.
     outText = humanIntroInsertion(outText);
 
     // Occasionally react to the source message with an emoji like a real
@@ -532,10 +532,10 @@ export function makeMessageHandler(deps: {
         }
       } else {
         await stopTyping(wa.sock, msg.groupJid);
-        logger.warn({ reply }, "Alfred returned no text and no action; nothing to send");
+        logger.warn({ reply }, "Maximus returned no text and no action; nothing to send");
       }
     } catch (err) {
-      logger.error({ err }, "Failed to send Alfred reply back to group");
+      logger.error({ err }, "Failed to send Maximus reply back to group");
     }
   };
 }
@@ -560,7 +560,7 @@ export function makeButtonHandler(deps: {
 
     logger.info(
       { king: effectiveKing.name, actionId: payload.actionId, confirmed: payload.confirmed },
-      "Executing Alfred action"
+      "Executing Maximus action"
     );
 
     let result;
@@ -571,7 +571,7 @@ export function makeButtonHandler(deps: {
         senderPhone: effectiveKing.phone,
       });
     } catch (err) {
-      logger.error({ err }, "Alfred execute call failed");
+      logger.error({ err }, "Maximus execute call failed");
       try {
         await wa.sendGroupMessage(payload.groupJid, ERR_TRY_AGAIN);
       } catch (sendErr) {

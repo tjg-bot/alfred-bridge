@@ -1,7 +1,7 @@
 /**
  * In-memory sliding-window rate limiter.
  *
- * Used to protect Alfred's WhatsApp account from spam and runaway loops:
+ * Used to protect Maximus's WhatsApp account from spam and runaway loops:
  *   - Per-sender caps to defend against a hijacked king number
  *   - Global cap to protect the account itself from any abuse pattern
  *   - Broadcast cap so a runaway cron cannot spam the group

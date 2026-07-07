@@ -1,9 +1,9 @@
 /**
- * Alfred Scribe - Claude Code worker running on Oracle.
+ * Maximus Scribe - Claude Code worker running on Oracle.
  *
- * Purpose: let Tyler text Alfred from anywhere ("Alfred, fix X in cron-Y")
+ * Purpose: let Tyler text Maximus from anywhere ("Maximus, fix X in cron-Y")
  * and have a headless Claude Code session make the change against the FK
- * repo, push to a branch, and report back. Alfred is the interface;
+ * repo, push to a branch, and report back. Maximus is the interface;
  * the Scribe is the hand.
  *
  * Flow:
@@ -11,7 +11,7 @@
  *   2. Scribe validates bridge secret + verifies requester is Tyler
  *   3. Runs in background: git pull main, create branch, invoke
  *      `claude -p "<prompt>"` in the repo, git commit + push
- *   4. Reports status back via the FK callback URL (or Alfred polls)
+ *   4. Reports status back via the FK callback URL (or Maximus polls)
  *
  * Safety rails baked in:
  *   - Only Tyler's email may trigger a task (checked at FK server AND here)
@@ -27,7 +27,7 @@
  *   SCRIBE_REPO_DIR       - local path on Oracle (default: /data/fractionkings)
  *   SCRIBE_GIT_TOKEN      - github PAT for pushing (NEW - add tomorrow)
  *   SCRIBE_GIT_USER_EMAIL - commit author email (default: alfred@fractionkings.com)
- *   SCRIBE_GIT_USER_NAME  - commit author name (default: Alfred Scribe)
+ *   SCRIBE_GIT_USER_NAME  - commit author name (default: Maximus Scribe)
  *   TYLER_EMAIL           - hard-coded to tyler@fractionkings.com; here as env
  *                           for override in case Tyler's email ever changes
  */
@@ -51,12 +51,12 @@ const TYLER_EMAIL = (process.env.TYLER_EMAIL || "tyler@fractionkings.com").toLow
 const REPO_URL = process.env.SCRIBE_REPO_URL || "https://github.com/tjg-bot/fractionkings.git";
 const REPO_DIR = process.env.SCRIBE_REPO_DIR || "/data/fractionkings";
 const GIT_USER_EMAIL = process.env.SCRIBE_GIT_USER_EMAIL || "alfred@fractionkings.com";
-const GIT_USER_NAME = process.env.SCRIBE_GIT_USER_NAME || "Alfred Scribe";
+const GIT_USER_NAME = process.env.SCRIBE_GIT_USER_NAME || "Maximus Scribe";
 const JOB_TIMEOUT_MS = 10 * 60 * 1000; // 10 min hard cap per subprocess
 const AUDIT_LOG = "/data/scribe-runs.jsonl";
 
 // Kill switch. Set SCRIBE_ENABLED=false on Oracle to reject ALL scribe traffic
-// while leaving Alfred chat + operational verbs intact. Default is disabled so
+// while leaving Maximus chat + operational verbs intact. Default is disabled so
 // tomorrow's finish-up is an explicit opt-in.
 const SCRIBE_ENABLED = String(process.env.SCRIBE_ENABLED || "false").toLowerCase() === "true";
 
@@ -219,7 +219,7 @@ async function runScribeJob(job: ScribeJob): Promise<void> {
     const changedFiles = namesOut.split("\n").map((s) => s.trim()).filter(Boolean);
     const scan = scanDiff(diffPatch, changedFiles);
     if (!scan.ok) {
-      // Reset the staged changes; do NOT push. Report offenders to Alfred.
+      // Reset the staged changes; do NOT push. Report offenders to Maximus.
       await runGit(["reset", "--hard", "origin/main"]);
       job.status = "failed";
       const parts: string[] = [];
@@ -258,7 +258,7 @@ async function runScribeJob(job: ScribeJob): Promise<void> {
     const sha = (await runGit(["rev-parse", "HEAD"])).trim();
     job.commitSha = sha;
     // NOTE: never --force here. If push is rejected, that's a real conflict
-    // and Tyler sees the error via the audit log + Alfred callback.
+    // and Tyler sees the error via the audit log + Maximus callback.
     await runGit(["push", "-u", "origin", branchName]);
 
     job.status = "done";

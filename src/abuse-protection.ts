@@ -4,7 +4,7 @@
  * Every inbound message costs money (Claude API for chat, Whisper for voice
  * STT, TTS for spoken replies, Scribe for code changes). If nothing gates
  * those calls, a single malicious actor with a WhatsApp handle in one of
- * Alfred's groups could burn hundreds of dollars a day.
+ * Maximus's groups could burn hundreds of dollars a day.
  *
  * This module runs BEFORE the FK call so blocked messages cost nothing.
  *
@@ -13,9 +13,9 @@
  *   1. Persistent blocklist. Phones on the blocklist are dropped immediately,
  *      no FK call, no Tyler alert (they already got their one).
  *
- *   2. Global throughput cap. Total messages Alfred processes per hour is
+ *   2. Global throughput cap. Total messages Maximus processes per hour is
  *      capped at ALFRED_ABUSE_GLOBAL_MSGS_PER_HOUR (default 200). If tripped,
- *      Alfred goes into "cool-down" and drops silently. Tyler gets one alert.
+ *      Maximus goes into "cool-down" and drops silently. Tyler gets one alert.
  *
  *   3. Per-sender text rate limit. Any single sender phone is capped at
  *      ALFRED_ABUSE_SENDER_MSGS_PER_HOUR (default 20). Trip = drop + one
@@ -27,7 +27,7 @@
  *
  *   5. Global daily cost budget (soft). Every message increments a
  *      day-counter with a rough token cost estimate. If we cross
- *      ALFRED_ABUSE_DAILY_USD_CAP (default 20), Alfred silences until
+ *      ALFRED_ABUSE_DAILY_USD_CAP (default 20), Maximus silences until
  *      midnight UTC and pings Tyler.
  *
  *   6. Auto-block after N violations. Any sender that trips a rate-limit
@@ -131,7 +131,7 @@ export async function checkAbuse(input: AbuseCheckInput): Promise<AbuseVerdict> 
     if (!alertedGlobalCap) {
       alertedGlobalCap = true;
       await recordViolation({ senderPhone: key, reason: "global-throughput-cap", logger: input.logger });
-      return { allow: false, reason: `global cap ${GLOBAL_MSGS_PER_HOUR}/hr hit - Alfred cooling down`, sendTylerAlert: true, senderPhone: key };
+      return { allow: false, reason: `global cap ${GLOBAL_MSGS_PER_HOUR}/hr hit - Maximus cooling down`, sendTylerAlert: true, senderPhone: key };
     }
     return { allow: false, reason: "global cap - cooldown", sendTylerAlert: false, senderPhone: key };
   }
