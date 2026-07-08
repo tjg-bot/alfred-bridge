@@ -191,12 +191,40 @@ export async function startWhatsappClient(opts: StartOpts): Promise<WAClient> {
 
     s.ev.on("creds.update", saveCreds);
 
+    // Pairing-code alternative to QR scan. Set WA_PAIRING_PHONE_NUMBER
+    // to e.g. "12125551234" (country code + number, digits only) and the
+    // bridge will request an 8-char pairing code from WhatsApp and print
+    // it to the logs. On the phone: WhatsApp -> Settings -> Linked
+    // Devices -> Link with phone number instead -> enter the code.
+    // Useful when device linking via QR is throttled.
+    const pairPhone = (process.env.WA_PAIRING_PHONE_NUMBER || "").replace(/\D/g, "");
+    let pairingCodeRequested = false;
+    const maybeRequestPairingCode = async () => {
+      if (!pairPhone || pairingCodeRequested) return;
+      if (state.creds.registered) return;
+      pairingCodeRequested = true;
+      try {
+        const code = await s.requestPairingCode(pairPhone);
+        const formatted = code.match(/.{1,4}/g)?.join("-") || code;
+        logger.info(
+          { pairPhone, code: formatted },
+          "PAIRING CODE READY - open WhatsApp -> Linked Devices -> Link with phone number instead -> enter code"
+        );
+      } catch (err) {
+        logger.error({ err }, "Failed to request pairing code");
+      }
+    };
+
     s.ev.on("connection.update", (update: Partial<ConnectionState>) => {
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
-        logger.info("QR code received. Scan with WhatsApp -> Linked Devices.");
-        qrcode.generate(qr, { small: true });
+        if (pairPhone && !state.creds.registered) {
+          void maybeRequestPairingCode();
+        } else {
+          logger.info("QR code received. Scan with WhatsApp -> Linked Devices.");
+          qrcode.generate(qr, { small: true });
+        }
       }
 
       if (connection === "open") {
